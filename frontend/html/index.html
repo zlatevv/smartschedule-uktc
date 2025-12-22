@@ -7,13 +7,34 @@
   <link rel="stylesheet" href="/frontend/css/style.css">
 </head>
 <body>
-  <header class="top-bar">
-    <div class="brand"><a href="#">Calypso Bet</a></div>
-    <div class="logo"><img src="/images/logo.png" alt="logo"></div>
-    <div class="auth">
-      <button>Sign In</button>
-      <button class="signup">Sign Up</button>
+  <div id="signupModal" class="modal" style="display:none;">
+    <div class="modal-content">
+      <h2>Sign Up</h2>
+      <input type="text" id="signupUsername" placeholder="Username">
+      <input type="email" id="signupEmail" placeholder="Email">
+      <input type="password" id="signupPassword" placeholder="Password">
+      <button onclick="signup()">Submit</button>
+      <button onclick="closeSignup()">Close</button>
     </div>
+  </div>
+
+  <!-- Sign In Modal -->
+  <div id="loginModal" class="modal" style="display:none;">
+    <div class="modal-content">
+      <h2>Sign In</h2>
+      <input type="email" id="loginEmail" placeholder="Email">
+      <input type="password" id="loginPassword" placeholder="Password">
+      <button onclick="login()">Submit</button>
+      <button onclick="closeLogin()">Close</button>
+    </div>
+  </div>
+    <header class="top-bar">
+      <div class="brand"><a href="#">Calypso Bet</a></div>
+      <div class="logo"><img src="/images/logo.png" alt="logo"></div>
+      <div class="auth">
+        <button class="signin">Sign In</button>
+        <button class="signup">Sign Up</button>
+      </div>
   </header>
 
   <div class="search-bar">
@@ -34,5 +55,6 @@
     </div>
     <p>© 2025 Calypso Bet</p>
   </footer>
+    <script src="/frontend/js/main.js"></script>  
 </body>
 </html>
