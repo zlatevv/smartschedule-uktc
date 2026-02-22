@@ -147,3 +147,80 @@
         transform: translateY(-50%);
     }
 }
+
+/* Разширяваме кутията за голямата таблица */
+.admin-full-width {
+    max-width: 1200px;
+    width: 95%;
+    padding: 30px;
+}
+
+.admin-header-flex {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
+}
+
+.admin-table-wrapper {
+    overflow-x: auto; /* Скрол при малки екрани */
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+}
+
+.admin-schedule-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+}
+
+.admin-schedule-table th {
+    background-color: #F9FAFB;
+    padding: 15px;
+    border-bottom: 2px solid var(--border-color);
+    color: var(--text-main);
+    font-weight: 700;
+}
+
+.admin-schedule-table td {
+    border: 1px solid var(--border-color);
+    padding: 8px;
+    vertical-align: top;
+}
+
+.hour-col {
+    background-color: #F3F4F6;
+    font-weight: 700;
+    text-align: center;
+    width: 80px;
+    color: #4F46E5;
+}
+
+/* Стил за входните полета в клетките */
+.cell-edit {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.cell-edit input {
+    width: 100%;
+    padding: 8px;
+    font-size: 0.85rem;
+    border: 1px solid transparent; /* Скрит бордюр по подразбиране */
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.cell-edit input:focus {
+    border-color: #4F46E5;
+    background-color: #F0F4FF;
+}
+
+.inp-sub { font-weight: 600; }
+.inp-room { color: #6B7280; font-size: 0.75rem !important; }
+
+.save-btn-top {
+    width: auto;
+    padding: 10px 25px;
+}
