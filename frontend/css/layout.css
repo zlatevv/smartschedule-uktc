@@ -1,0 +1,149 @@
+/* =========================================================
+   1. СТИЛОВЕ ЗА ПРОГРАМАТА (schedule.html)
+   (Тези си остават същите)
+========================================================= */
+.schedule-scroll-wrapper {
+    overflow-x: auto;
+    padding-bottom: 20px;
+    scrollbar-width: thin;
+}
+
+.schedule-grid {
+    display: grid;
+    grid-template-columns: 80px repeat(5, minmax(140px, 1fr));
+    gap: 15px;
+    min-width: 850px;
+}
+
+.grid-head {
+    text-align: center;
+    font-weight: 700;
+    padding-bottom: 10px;
+}
+
+.time-slot {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.slot-time {
+    font-size: 0.8rem;
+    color: var(--text-light);
+    font-weight: normal;
+}
+
+/* =========================================================
+   2. СТИЛОВЕ ЗА НАЧАЛНАТА СТРАНИЦА (index.html)
+========================================================= */
+.index-main {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 60px 20px; /* Повече въздух около всичко */
+    gap: 60px;
+}
+
+/* Контейнер за кутиите */
+.cards-container {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: stretch; /* Кара кутиите да са с еднаква височина */
+    gap: 50px; /* По-голямо разстояние между тях */
+    width: 100%;
+    max-width: 1100px;
+}
+
+/* Стил на самите карти */
+.section-box {
+    background-color: var(--card-bg);
+    padding: 50px; /* Повече вътрешно пространство */
+    border-radius: 24px; /* По-заоблени ъгли */
+    /* Много по-мека и модерна сянка */
+    box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.08), 0 10px 20px -10px rgba(0, 0, 0, 0.04);
+    width: 100%;
+    max-width: 420px;
+    text-align: center;
+    box-sizing: border-box;
+    /* Много фин бордюр за по-добра дефиниция */
+    border: 1px solid rgba(229, 231, 235, 0.5);
+    display: flex;
+    flex-direction: column;
+    justify-content: center; /* Центрира съдържанието вертикално */
+}
+
+/* === НОВ СТИЛ ЗА РАЗДЕЛИТЕЛЯ "ИЛИ" === */
+.divider {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #9CA3AF;
+    font-size: 1rem;
+    font-weight: 700;
+    position: relative;
+    min-height: 100px; /* Минимална височина за вертикалната линия */
+}
+
+/* Кръгчето с текста "ИЛИ" */
+.divider span {
+    background-color: var(--bg-main); /* Фонът на страницата, за да скрие линията отдолу */
+    padding: 12px;
+    border-radius: 50%;
+    z-index: 2; /* Да е над линията */
+    border: 2px solid var(--border-color);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+}
+
+/* Вертикалната линия зад кръгчето */
+.divider::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 2px; /* Плътна линия */
+    background-color: var(--border-color);
+    transform: translateX(-50%);
+    z-index: 1;
+}
+
+
+/* =========================================================
+   3. МОБИЛНА ВЕРСИЯ (За таблети и телефони - под 992px)
+========================================================= */
+@media (max-width: 992px) {
+    .cards-container {
+        flex-direction: column;
+        gap: 40px;
+        align-items: center;
+    }
+
+    .section-box {
+        max-width: 100%; /* На цяла ширина на малък екран */
+    }
+
+    /* Разделителят става хоризонтален */
+    .divider {
+        flex-direction: row;
+        width: 100%;
+        max-width: 420px;
+        min-height: auto;
+        padding: 20px 0;
+    }
+
+    /* Линията става хоризонтална */
+    .divider::before {
+        width: 100%;
+        height: 2px;
+        top: 50%;
+        left: 0;
+        bottom: auto;
+        transform: translateY(-50%);
+    }
+}

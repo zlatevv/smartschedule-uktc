@@ -1,60 +1,70 @@
 <!DOCTYPE html>
 <html lang="bg">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Calypso Bet</title>
-  <link rel="stylesheet" href="/frontend/css/style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartSchedule - Начало</title>
+    <link rel="stylesheet" href="/frontend/css/base.css">
+    <link rel="stylesheet" href="/frontend/css/components.css">
+    <link rel="stylesheet" href="/frontend/css/layout.css">
+    <link rel="stylesheet" href="/frontend/css/variables.css">
 </head>
 <body>
-  <div id="signupModal" class="modal" style="display:none;">
-    <div class="modal-content">
-      <h2>Sign Up</h2>
-      <input type="text" id="signupUsername" placeholder="Username">
-      <input type="email" id="signupEmail" placeholder="Email">
-      <input type="password" id="signupPassword" placeholder="Password">
-      <button onclick="signup()">Submit</button>
-      <button onclick="closeSignup()">Close</button>
-    </div>
-  </div>
 
-  <!-- Sign In Modal -->
-  <div id="loginModal" class="modal" style="display:none;">
-    <div class="modal-content">
-      <h2>Sign In</h2>
-      <input type="email" id="loginEmail" placeholder="Email">
-      <input type="password" id="loginPassword" placeholder="Password">
-      <button onclick="login()">Submit</button>
-      <button onclick="closeLogin()">Close</button>
-    </div>
-  </div>
-    <header class="top-bar">
-      <div class="brand"><a href="#">Calypso Bet</a></div>
-      <div class="logo"><img src="/images/logo.png" alt="logo"></div>
-      <div class="auth">
-        <button class="signin">Sign In</button>
-        <button class="signup">Sign Up</button>
-      </div>
-  </header>
+    <header>
+        <div class="logo">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="16" y1="2" x2="16" y2="6"></line>
+                <line x1="8" y1="2" x2="8" y2="6"></line>
+                <line x1="3" y1="10" x2="21" y2="10"></line>
+            </svg>
+            SmartSchedule
+        </div>
+    </header>
 
-  <div class="search-bar">
-    <input type="text" placeholder="Search...">
-  </div>
+    <main class="index-main">
+        
+        <div class="cards-container">
+            
+            <div class="section-box">
+                <h2>За ученици</h2>
+                <p class="subtitle">Избери своя клас, за да видиш програмата си.</p>
+                
+                <form action="table-schedule.html" method="GET">
+                    <div class="form-group">
+                        <select name="class" required>
+                            <option value="" disabled selected>-- Избери клас --</option>
+                            <option value="8a">8А Клас</option>
+                            <option value="9a">9А Клас</option>
+                            <option value="10a">10А Клас</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn-primary">Покажи програма</button>
+                </form>
+            </div>
 
-  <nav class="main-nav">
-    <a href="/frontend/html/slots.html"><img src="/images/slots.jpg" alt="slots"></a>
-    <a href="/frontend/html/sportsbet.html"><img src="/images/sportsbet.jpg" alt="sportsbet"></a>
-    <a href="/frontend/html/roulette.html"><img src="/images/roullette.jpg" alt="roulette"></a>
-  </nav>
+           <div class="divider"><span>ИЛИ</span></div>
 
-  <footer>
-    <div class="links">
-      <a href="/frontend/html/index.html">Home</a>
-      <a href="#">About Us</a>
-      <a href="#">Contacts</a>
-    </div>
-    <p>© 2025 Calypso Bet</p>
-  </footer>
-    <script src="/frontend/js/main.js"></script>  
+            <div class="section-box" style="border: 2px solid #E5E7EB;">
+                <h2>Администрация</h2>
+                <p class="subtitle">Вход за учители за редакция на програмата.</p>
+                
+                <form id="loginForm">
+                    <div class="form-group">
+                        <label for="username">Потребителско име</label>
+                        <input type="text" id="username" placeholder="admin" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Парола</label>
+                        <input type="password" id="password" placeholder="••••••••" required>
+                    </div>
+                    <button type="button" class="btn-primary" style="background-color: #1F2937;" onclick="alert('Тук ще се свържем с базата данни!')">Вход в системата</button>
+                </form>
+            </div>
+            
+        </div> 
+    </main>
+
 </body>
 </html>

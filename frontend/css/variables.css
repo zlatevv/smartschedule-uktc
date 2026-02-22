@@ -1,0 +1,21 @@
+:root {
+    /* Базови цветове за сайта */
+    --bg-main: #F8FAFC;
+    --text-dark: #1F2937;
+    --text-light: #6B7280;
+    --accent-blue: #4F46E5;
+    --accent-hover: #4338CA;
+    --card-bg: #FFFFFF;
+    --border-color: #E5E7EB;
+
+    /* Цветове за предметите в програмата */
+    --color-math: #FBD2B5;
+    --color-lang: #C4D7F3;
+    --color-bio: #C2EBC6;
+    --color-hist: #F7C4C8;
+    --color-eng: #E2CFF3;
+
+    /* Размери */
+    --card-radius: 12px;
+    --soft-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+}

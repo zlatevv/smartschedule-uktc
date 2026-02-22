@@ -1,0 +1,98 @@
+/* --- КАРТИ ЗА ПРЕДМЕТИТЕ --- */
+.subject-card {
+    border-radius: var(--card-radius);
+    padding: 15px;
+    text-align: center;
+    box-shadow: var(--soft-shadow);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-height: 100px;
+    background-color: #fff;
+}
+
+.subject-name {
+    font-weight: 800;
+    font-size: 1rem;
+    margin-bottom: 4px;
+}
+
+.subject-details {
+    font-size: 0.85rem;
+    color: var(--text-light);
+}
+
+/* Цветове-модификатори */
+.bg-math { background-color: var(--color-math); }
+.bg-lang { background-color: var(--color-lang); }
+.bg-bio { background-color: var(--color-bio); }
+.bg-eng { background-color: var(--color-eng); }
+
+/* --- ФОРМИ, БУТОНИ И ЛОГО --- */
+.custom-select-btn {
+    appearance: none;
+    -webkit-appearance: none;
+    padding: 10px 20px;
+    padding-right: 40px;
+    border-radius: 30px;
+    border: 1px solid var(--border-color);
+    background-color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20width%3D%27292.4%27%20height%3D%27292.4%27%3E%3Cpath%20fill%3D%27%231F2937%27%20d%3D%27M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-13%205.4A17.6%2017.6%200%200%200%200%2087.2c0%205%201.8%209.3%205.4%2013l135.1%20135.1c3.6%203.6%207.9%205.4%2013%205.4%2017.6%200%205-1.8%208.6-5.4l135.1-135.1c3.6-3.6%205.4-7.9%205.4-13%200-5-1.8-9.3-5.4-13z%27%2F%3E%3C%2Fsvg%3E");
+    background-repeat: no-repeat;
+    background-position: right 15px center;
+    background-size: 12px;
+}
+
+.form-group { 
+    margin-bottom: 20px; 
+    text-align: left; 
+}
+
+label { 
+    display: block; 
+    font-size: 0.85rem; 
+    font-weight: 600; 
+    margin-bottom: 8px; 
+    color: #4B5563; 
+}
+
+input[type="text"], input[type="password"], select { 
+    width: 100%; 
+    padding: 12px 15px; 
+    border: 1px solid var(--border-color); 
+    border-radius: 8px; 
+    font-family: inherit; 
+    font-size: 1rem; 
+    box-sizing: border-box; 
+}
+.btn-primary { 
+    background-color: var(--accent-blue); 
+    color: white; 
+    border: none; 
+    padding: 14px 20px; 
+    border-radius: 8px; 
+    width: 100%; 
+    font-size: 1rem; 
+    font-weight: 600; 
+    cursor: pointer; 
+}
+
+.logo-container { 
+    text-align: center; 
+}
+
+.logo { 
+    font-size: 2.5rem; 
+    font-weight: 800;
+    margin-top: 1.2em; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    gap: 12px; 
+}
+
+.logo svg { 
+    color: var(--accent-blue); 
+}
