@@ -1,1 +1,5 @@
+com\zlatev\smartschedule\entity\Grade.class
+com\zlatev\smartschedule\entity\Subject.class
+com\zlatev\smartschedule\entity\Room.class
 com\zlatev\smartschedule\Main.class
+com\zlatev\smartschedule\entity\Teacher.class

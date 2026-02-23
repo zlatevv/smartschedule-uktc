@@ -1,17 +1,37 @@
 package com.zlatev.smartschedule;
 
-//TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or
-// click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
-public class Main {
-    static void main() {
-        //TIP Press <shortcut actionId="ShowIntentionActions"/> with your caret at the highlighted text
-        // to see how IntelliJ IDEA suggests fixing it.
-        IO.println(String.format("Hello and welcome!"));
+import com.zlatev.smartschedule.entity.Grade;
+import com.zlatev.smartschedule.entity.Teacher;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.EntityManagerFactory;
+import jakarta.persistence.Persistence;
 
-        for (int i = 1; i <= 5; i++) {
-            //TIP Press <shortcut actionId="Debug"/> to start debugging your code. We have set one <icon src="AllIcons.Debugger.Db_set_breakpoint"/> breakpoint
-            // for you, but you can always add more by pressing <shortcut actionId="ToggleLineBreakpoint"/>.
-            IO.println("i = " + i);
-        }
+public class Main {
+    public static void main(String[] args) {
+        EntityManagerFactory emf = Persistence.createEntityManagerFactory("smartschedule-PU");
+        EntityManager em = emf.createEntityManager();
+
+        em.getTransaction().begin();
+
+        // 1. Create and save Teachers FIRST (because Grade depends on Teacher)
+        Teacher teacher1 = new Teacher("Иван Иванов"); // Assuming your Teacher class takes a name
+        em.persist(teacher1);
+
+        // 2. Create and save the Grade using the teacher
+        Grade grade9A = new Grade("9A Клас", teacher1);
+        em.persist(grade9A);
+
+        // 3. Create and save Subjects (Предмети)
+        // Subject math = new Subject("Математика");
+        // Subject biology = new Subject("Биология");
+        // em.persist(math);
+        // em.persist(biology);
+
+        em.getTransaction().commit();
+
+        System.out.println("Data successfully seeded into the database!");
+
+        em.close();
+        emf.close();
     }
 }
