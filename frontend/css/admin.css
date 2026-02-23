@@ -1,0 +1,90 @@
+/* =========================================================
+   СТИЛОВЕ ЗА АДМИН ПАНЕЛА (admin.css)
+========================================================= */
+
+/* Контейнер за подредба на таблица + сайдбар */
+.admin-layout-container {
+    display: flex;
+    gap: 25px;
+    max-width: 1400px;
+    margin: 0 auto;
+    align-items: flex-start;
+}
+
+/* Страничен панел с предмети */
+.subjects-sidebar {
+    width: 280px;
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    position: sticky;
+    top: 20px;
+    flex-shrink: 0;
+}
+
+.sidebar-header {
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 15px;
+}
+
+.subjects-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+/* Стил за самите предмети (draggable) */
+.draggable-subject {
+    padding: 12px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: grab;
+    text-align: center;
+    border: 1px solid rgba(0,0,0,0.05);
+    transition: transform 0.1s;
+}
+
+.draggable-subject:active {
+    cursor: grabbing;
+    transform: scale(0.98);
+}
+
+/* Бутони в админ панела */
+.btn-add-subject {
+    width: 100%;
+    padding: 10px;
+    background: #F3F4F6;
+    border: 1px dashed #9CA3AF;
+    border-radius: 8px;
+    cursor: pointer;
+    margin-top: 15px;
+    font-weight: 600;
+    color: #4B5563;
+}
+
+.btn-add-subject:hover {
+    background: #E5E7EB;
+}
+
+.btn-secondary {
+    background: #F3F4F6;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    cursor: pointer;
+    color: #4B5563;
+    font-weight: 600;
+    transition: 0.2s;
+}
+
+.btn-secondary:hover {
+    background: #E5E7EB;
+}
+
+/* Ефекти при влачене над клетка (Drag Over) */
+.drop-zone.drag-over {
+    background-color: #f0f9ff !important;
+    outline: 2px dashed #3b82f6;
+    outline-offset: -2px;
+}
