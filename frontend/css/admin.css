@@ -88,3 +88,184 @@
     outline: 2px dashed #3b82f6;
     outline-offset: -2px;
 }
+
+/* Активна клетка при клик */
+.drop-zone.active-cell {
+    outline: 2px solid #3b82f6;
+    background-color: #f0f9ff;
+}
+
+/* Стилизиране на вътрешността на попълнена клетка */
+.cell-content {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 8px;
+    border-radius: 6px;
+    min-height: 80px;
+    transition: all 0.2s;
+    border: 1px dashed #d1d5db;
+    cursor: pointer;
+}
+
+.cell-content.filled {
+    border: 1px solid rgba(0,0,0,0.1);
+}
+
+.cell-subject-title {
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 0; /* Променено на 0, за да се контролира от аниматора */
+}
+
+/* Подсказка за празна клетка */
+.empty-hint {
+    color: #9ca3af;
+    font-size: 0.8rem;
+    text-align: center;
+    margin-top: 20px;
+}
+
+/* ==========================================
+   КРАСИВИ ПАДАЩИ МЕНЮТА (ОБЩИ)
+   ========================================== */
+select {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-color: #fff;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 8px 35px 8px 12px;
+    font-size: 0.9rem;
+    color: #374151;
+    cursor: pointer;
+    outline: none;
+    transition: all 0.2s ease;
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="%236B7280"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>');
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    background-size: 16px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+select:focus {
+    border-color: #3bf660;
+    box-shadow: 0 0 0 3px rgba(59, 246, 96, 0.2); /* Съвместимо със зеления цвят отгоре */
+}
+
+select:hover {
+    border-color: #9ca3af;
+}
+
+/* ==========================================
+   АНИМАЦИЯ НА ПАДАЩИТЕ МЕНЮТА В ТАБЛИЦАТА
+   ========================================== */
+
+/* Специфично за малките менюта в таблицата (без display: none/block) */
+.cell-select {
+    width: 100%;
+    padding: 6px 25px 6px 8px;
+    font-size: 0.8rem;
+    border-radius: 6px;
+}
+
+/* Външен контейнер: Анимира височината плавно от 0 до реалния размер */
+.dropdown-animator {
+    display: grid;
+    grid-template-rows: 0fr; /* Скрито състояние (височина 0) */
+    transition: grid-template-rows 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Вътрешен контейнер: Анимира прозрачността и леко плъзгане */
+.dropdown-animator-inner {
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 6px; /* Разстояние между менюто за учител и стая */
+    opacity: 0;
+    transform: translateY(-10px); /* Леко повдигнато нагоре преди да се появи */
+    transition: opacity 0.3s ease-out, transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Когато клетката се напълни с предмет, активираме анимациите */
+.cell-content.filled .dropdown-animator {
+    grid-template-rows: 1fr; /* Разпъва се до нужния размер */
+}
+
+.cell-content.filled .dropdown-animator-inner {
+    opacity: 1; /* Става видимо */
+    transform: translateY(0); /* Пада на точното си място */
+    padding-top: 8px; /* Отстояние от името на предмета */
+}
+
+/* ==========================================
+   МОДАЛНИ ПРОЗОРЦИ (MODALS)
+   ========================================== */
+.modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(17, 24, 39, 0.6);
+    backdrop-filter: blur(4px);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.modal-overlay.active {
+    display: flex;
+    opacity: 1;
+}
+
+.modal-box {
+    background: white;
+    padding: 30px;
+    border-radius: 16px;
+    width: 100%;
+    max-width: 400px;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    transform: translateY(20px);
+    transition: transform 0.2s ease;
+}
+
+.modal-overlay.active .modal-box {
+    transform: translateY(0);
+}
+
+.modal-box h3 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    color: #111827;
+}
+
+.modal-box p {
+    color: #6B7280;
+    font-size: 0.9rem;
+    margin-bottom: 20px;
+}
+
+.modal-input {
+    width: 100%;
+    padding: 12px 15px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 1rem;
+    outline: none;
+    transition: all 0.2s ease;
+    box-sizing: border-box;
+}
+
+.modal-input:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 25px;
+}

@@ -34,9 +34,6 @@
                         <h2>Редакция на седмична програма</h2>
                         <p class="subtitle" style="display: flex; align-items: center; gap: 10px;">Клас: 
                             <select id="class-select-admin" class="custom-select-btn">
-                                <option value="8a">8А Клас</option>
-                                <option value="9a">9А Клас</option>
-                                <option value="10a">10А Клас</option>
                             </select>
                             <button class="btn-secondary btn-add-class" style="padding: 10px 15px;">+ Добави клас</button>
                         </p>
@@ -56,25 +53,7 @@
                                 <th>Петък</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            <script>
-                                const days = ['mon', 'tue', 'wed', 'thu', 'fri'];
-                                for (let i = 1; i <= 7; i++) {
-                                    document.write(`
-                                        <tr>
-                                            <td class="hour-col">${i} час</td>
-                                            ${days.map(day => `
-                                                <td class="drop-zone">
-                                                    <div class="cell-edit">
-                                                        <input type="text" placeholder="Предмет" class="inp-sub" data-slot="${day}-${i}-sub">
-                                                        <input type="text" placeholder="Стая" class="inp-room" data-slot="${day}-${i}-room">
-                                                    </div>
-                                                </td>
-                                            `).join('')}
-                                        </tr>
-                                    `);
-                                }
-                            </script>
+                        <tbody id="schedule-tbody">
                         </tbody>
                     </table>
                 </div>
@@ -87,11 +66,6 @@
                 </div>
                 
                 <div class="subjects-list" id="subjects-list">
-                    <div class="draggable-subject subject-item bg-math" draggable="true">Математика</div>
-                    <div class="draggable-subject subject-item bg-lang" draggable="true">Бълг. език</div>
-                    <div class="draggable-subject subject-item bg-eng" draggable="true">Английски</div>
-                    <div class="draggable-subject subject-item bg-bio" draggable="true">Биология</div>
-                    <div class="draggable-subject subject-item" draggable="true" style="background:#f3f4f6">Физкултура</div>
                 </div>
                 
                 <p style="font-size: 0.8rem; color: #6B7280; margin-top: 20px; text-align: center; line-height: 1.4;">
@@ -101,7 +75,30 @@
 
         </div>
     </main>
+    <div id="modal-add-class" class="modal-overlay">
+        <div class="modal-box">
+            <h3>Добави нов клас</h3>
+            <p>Въведете името на класа (напр. 12Б):</p>
+            <input type="text" id="input-new-class" class="modal-input" placeholder="Име на клас...">
+            <div class="modal-actions">
+                <button class="btn-secondary" onclick="closeModal('modal-add-class')">Отказ</button>
+                <button class="btn-primary" id="confirm-add-class">Добави клас</button>
+            </div>
+        </div>
+    </div>
 
+    <div id="modal-add-subject" class="modal-overlay">
+        <div class="modal-box">
+            <h3>Добави нов предмет</h3>
+            <p>Въведете името на предмета:</p>
+            <input type="text" id="input-new-subject" class="modal-input" placeholder="Име на предмет...">
+            <div class="modal-actions">
+                <button class="btn-secondary" onclick="closeModal('modal-add-subject')">Отказ</button>
+                <button class="btn-primary" id="confirm-add-subject">Добави предмет</button>
+            </div>
+        </div>
+    </div>
+    
     <script src="/frontend/js/admin.js"></script>
 </body>
 </html>

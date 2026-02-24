@@ -1,5 +1,13 @@
-com\zlatev\smartschedule\entity\Grade.class
+com\zlatev\smartschedule\controller\GradeController.class
+com\zlatev\smartschedule\controller\SubjectController.class
 com\zlatev\smartschedule\entity\Subject.class
+com\zlatev\smartschedule\repository\SubjectRepository.class
 com\zlatev\smartschedule\entity\Room.class
-com\zlatev\smartschedule\Main.class
+com\zlatev\smartschedule\controller\RoomController.class
+com\zlatev\smartschedule\repository\GradeRepository.class
+com\zlatev\smartschedule\controller\TeacherController.class
+com\zlatev\smartschedule\App.class
+com\zlatev\smartschedule\entity\Grade.class
+com\zlatev\smartschedule\repository\RoomRepository.class
+com\zlatev\smartschedule\repository\TeacherRepository.class
 com\zlatev\smartschedule\entity\Teacher.class

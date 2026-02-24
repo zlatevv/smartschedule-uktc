@@ -1,5 +1,13 @@
-C:\Users\cveta\Documents\uktc-smartschedule\backend\smartschedule\src\main\java\com\zlatev\smartschedule\entity\Grade.java
-C:\Users\cveta\Documents\uktc-smartschedule\backend\smartschedule\src\main\java\com\zlatev\smartschedule\entity\Room.java
+C:\Users\cveta\Documents\uktc-smartschedule\backend\smartschedule\src\main\java\com\zlatev\smartschedule\repository\GradeRepository.java
+C:\Users\cveta\Documents\uktc-smartschedule\backend\smartschedule\src\main\java\com\zlatev\smartschedule\App.java
+C:\Users\cveta\Documents\uktc-smartschedule\backend\smartschedule\src\main\java\com\zlatev\smartschedule\controller\RoomController.java
+C:\Users\cveta\Documents\uktc-smartschedule\backend\smartschedule\src\main\java\com\zlatev\smartschedule\repository\SubjectRepository.java
+C:\Users\cveta\Documents\uktc-smartschedule\backend\smartschedule\src\main\java\com\zlatev\smartschedule\repository\TeacherRepository.java
+C:\Users\cveta\Documents\uktc-smartschedule\backend\smartschedule\src\main\java\com\zlatev\smartschedule\controller\TeacherController.java
 C:\Users\cveta\Documents\uktc-smartschedule\backend\smartschedule\src\main\java\com\zlatev\smartschedule\entity\Subject.java
+C:\Users\cveta\Documents\uktc-smartschedule\backend\smartschedule\src\main\java\com\zlatev\smartschedule\entity\Room.java
+C:\Users\cveta\Documents\uktc-smartschedule\backend\smartschedule\src\main\java\com\zlatev\smartschedule\controller\GradeController.java
+C:\Users\cveta\Documents\uktc-smartschedule\backend\smartschedule\src\main\java\com\zlatev\smartschedule\entity\Grade.java
 C:\Users\cveta\Documents\uktc-smartschedule\backend\smartschedule\src\main\java\com\zlatev\smartschedule\entity\Teacher.java
-C:\Users\cveta\Documents\uktc-smartschedule\backend\smartschedule\src\main\java\com\zlatev\smartschedule\Main.java
+C:\Users\cveta\Documents\uktc-smartschedule\backend\smartschedule\src\main\java\com\zlatev\smartschedule\repository\RoomRepository.java
+C:\Users\cveta\Documents\uktc-smartschedule\backend\smartschedule\src\main\java\com\zlatev\smartschedule\controller\SubjectController.java
