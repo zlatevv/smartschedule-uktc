@@ -78,8 +78,19 @@
     <div id="modal-add-class" class="modal-overlay">
         <div class="modal-box">
             <h3>Добави нов клас</h3>
-            <p>Въведете името на класа (напр. 12Б):</p>
-            <input type="text" id="input-new-class" class="modal-input" placeholder="Име на клас...">
+            
+            <div class="modal-form-group">
+                <label>Име на класа (напр. 12Б):</label>
+                <input type="text" id="input-new-class" class="modal-input" placeholder="Име на клас...">
+            </div>
+
+            <div class="modal-form-group">
+                <label>Класен ръководител:</label>
+                <select id="select-class-teacher" class="modal-input">
+                    <option value="">-- Изберете учител --</option>
+                </select>
+            </div>
+
             <div class="modal-actions">
                 <button class="btn-secondary" onclick="closeModal('modal-add-class')">Отказ</button>
                 <button class="btn-primary" id="confirm-add-class">Добави клас</button>
@@ -90,8 +101,27 @@
     <div id="modal-add-subject" class="modal-overlay">
         <div class="modal-box">
             <h3>Добави нов предмет</h3>
-            <p>Въведете името на предмета:</p>
-            <input type="text" id="input-new-subject" class="modal-input" placeholder="Име на предмет...">
+            
+            <div class="modal-form-group">
+                <label>Име на предмета:</label>
+                <input type="text" id="input-new-subject" class="modal-input" placeholder="Напр. Математика...">
+            </div>
+
+            <div class="modal-form-group">
+                <label>Описание:</label>
+                <textarea id="input-subject-desc" class="modal-input" placeholder="Кратко описание..." rows="3"></textarea>
+            </div>
+
+            <div class="modal-form-group">
+                <label>Тип на предмета:</label>
+                <select id="select-subject-type" class="modal-input">
+                    <option>Общообразователен</option>
+                    <option>Професионален</option>
+                    <option>Практика</option>
+                    <option>Извънкласен</option>
+                </select>
+            </div>
+
             <div class="modal-actions">
                 <button class="btn-secondary" onclick="closeModal('modal-add-subject')">Отказ</button>
                 <button class="btn-primary" id="confirm-add-subject">Добави предмет</button>

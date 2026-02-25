@@ -9,6 +9,16 @@ const db = {
     rooms: []
 };
 
+const classTimes = [
+    "08:00 - 08:45", // 1 час
+    "09:05 - 09:50", // 2 час
+    "10:00 - 10:45", // 3 час
+    "10:55 - 11:40", // 4 час (Голямо междучасие)
+    "11:50 - 12:35", // 5 час
+    "12:45 - 13:30", // 6 час
+    "13:50 - 14:35"  // 7 час
+];
+
 let activeCell = null; // Пази коя клетка е активна
 
 // Умна функция за генериране на уникален пастелен цвят базиран на името
@@ -143,7 +153,11 @@ function renderScheduleTable() {
         
         const tdHour = document.createElement('td');
         tdHour.className = 'hour-col';
-        tdHour.textContent = `${i} час`;
+        // Използваме innerHTML, за да сложим часа и времето на два отделни реда за по-добър вид
+        tdHour.innerHTML = `
+            <div style="font-weight: bold; margin-bottom: 4px; color: #4F46E5;">${i} час</div>
+            <div style="font-size: 0.75rem; color: #6B7280; white-space: nowrap;">${classTimes[i-1]}</div>
+        `;
         tr.appendChild(tdHour);
         
         days.forEach(day => {
@@ -250,34 +264,111 @@ function closeModal(id) {
 
 function initAddClass() {
     const btnConfirm = document.getElementById('confirm-add-class');
-    const input = document.getElementById('input-new-class');
+    const inputClassCode = document.getElementById('input-new-class');
+    const selectTeacher = document.getElementById('select-class-teacher');
     
-    document.querySelector('.btn-add-class')?.addEventListener('click', () => openModal('modal-add-class'));
+    document.querySelector('.btn-add-class')?.addEventListener('click', () => {
+        selectTeacher.innerHTML = '<option value="">-- Изберете учител --</option>';
+        
+        // ВАЖНО: Използваме t.id за стойност на опцията
+        db.teachers.forEach(t => {
+            const opt = document.createElement('option');
+            opt.value = t.id; // <--- Тук трябва да е ID-то от базата (напр. 2 за Ани Илиева)
+            opt.textContent = t.name;
+            selectTeacher.appendChild(opt);
+        });
+        
+        openModal('modal-add-class');
+    });
 
     btnConfirm?.addEventListener('click', async () => {
-        const val = input.value.trim();
-        if (val) {
-            // Тук можеш да добавиш fetch POST до /api/classes
-            db.classes.push(val);
-            renderClasses();
-            closeModal('modal-add-class');
+        const classCodeVal = inputClassCode.value.trim();
+        const teacherIdVal = selectTeacher.value; // Трябва да е числото (ID)
+        
+        if (classCodeVal && teacherIdVal) {
+            try {
+                const response = await fetch('http://localhost:8080/api/classes', {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        classCode: classCodeVal,
+                        classTeacher: {
+                            id: parseInt(teacherIdVal) // <--- Изпращаме само ID-то
+                        }
+                    })
+                });
+
+                if (response.ok) {
+                    db.classes.push(classCodeVal);
+                    renderClasses();
+                    closeModal('modal-add-class');
+                    inputClassCode.value = '';
+                    selectTeacher.value = '';
+                } else {
+                    const errorText = await response.text();
+                    alert("Грешка от сървъра: " + errorText);
+                }
+            } catch (error) {
+                console.error("Мрежова грешка:", error);
+                alert("Няма връзка със сървъра!");
+            }
+        } else {
+            alert("Моля, въведете име на класа и изберете класен ръководител.");
         }
     });
 }
-
 function initAddSubject() {
     const btnConfirm = document.getElementById('confirm-add-subject');
-    const input = document.getElementById('input-new-subject');
+    const inputName = document.getElementById('input-new-subject');
+    const inputDesc = document.getElementById('input-subject-desc');
+    const selectType = document.getElementById('select-subject-type');
 
     document.getElementById('add-subject-btn')?.addEventListener('click', () => openModal('modal-add-subject'));
 
     btnConfirm?.addEventListener('click', async () => {
-        const val = input.value.trim();
-        if (val) {
-            // Тук можеш да добавиш fetch POST до /api/subjects
-            db.subjects.push({ name: val, color: generateDistinctColor(val) });
-            renderSubjectsSidebar();
-            closeModal('modal-add-subject');
+        const name = inputName.value.trim();
+        const desc = inputDesc.value.trim();
+        const type = selectType.value;
+
+        if (name) {
+            try {
+                const response = await fetch('http://localhost:8080/api/subjects', {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        subjectName: name,
+                        subjectDescription: desc,
+                        subjectType: type
+                    })
+                });
+
+                if (response.ok) {
+                    const savedSubject = await response.json();
+                    
+                    // Добавяме в локалния db обект
+                    db.subjects.push({ 
+                        id: savedSubject.subjectId, 
+                        name: savedSubject.subjectName, 
+                        color: generateDistinctColor(savedSubject.subjectName) 
+                    });
+
+                    renderSubjectsSidebar();
+                    closeModal('modal-add-subject');
+                    
+                    // Изчистване на полетата
+                    inputName.value = '';
+                    inputDesc.value = '';
+                    selectType.selectedIndex = 0;
+                } else {
+                    alert("Грешка при запис на сървъра.");
+                }
+            } catch (error) {
+                console.error("Мрежова грешка:", error);
+            }
+        } else {
+            alert("Моля, въведете име на предмета.");
         }
     });
 }

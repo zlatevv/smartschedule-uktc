@@ -6,14 +6,14 @@
 .admin-layout-container {
     display: flex;
     gap: 25px;
-    max-width: 1400px;
+    max-width: 1600px;
     margin: 0 auto;
     align-items: flex-start;
 }
 
 /* Страничен панел с предмети */
 .subjects-sidebar {
-    width: 280px;
+    width: 375px;
     background: white;
     padding: 20px;
     border-radius: 12px;
@@ -29,39 +29,43 @@
     padding-bottom: 15px;
 }
 
+/* Промяна на списъка, за да поддържа две колони */
 .subjects-list {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
+    display: grid;                   /* Превръщаме го в грид */
+    grid-template-columns: 1fr 1fr;  /* Дефинираме две равни колони */
+    gap: 10px;                       /* Разстояние между елементите */
 }
 
-/* Стил за самите предмети (draggable) */
-.draggable-subject {
-    padding: 12px;
-    border-radius: 8px;
-    font-weight: 600;
-    cursor: grab;
-    text-align: center;
-    border: 1px solid rgba(0,0,0,0.05);
-    transition: transform 0.1s;
-}
-
-.draggable-subject:active {
-    cursor: grabbing;
-    transform: scale(0.98);
-}
-
-/* Бутони в админ панела */
+/* Правим бутона за добавяне да заема целия ред над предметите */
 .btn-add-subject {
+    grid-column: span 2;             /* Бутонът се разпъва върху двете колони */
     width: 100%;
     padding: 10px;
     background: #F3F4F6;
     border: 1px dashed #9CA3AF;
     border-radius: 8px;
     cursor: pointer;
-    margin-top: 15px;
+    margin-bottom: 15px;             /* Сменяме margin-top с bottom */
     font-weight: 600;
     color: #4B5563;
+}
+
+/* Стил за самите предмети - намаляваме малко padding-а, за да се събират по-добре */
+.draggable-subject {
+    padding: 10px 5px;               /* По-малко хоризонтален падинг */
+    font-size: 0.85rem;              /* Малко по-малък шрифт за по-добра четимост в две колони */
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: grab;
+    text-align: center;
+    border: 1px solid rgba(0,0,0,0.05);
+    transition: transform 0.1s;
+    word-wrap: break-word;           /* Да пренася дълги думи, ако не се събират */
+}
+
+.draggable-subject:active {
+    cursor: grabbing;
+    transform: scale(0.98);
 }
 
 .btn-add-subject:hover {
@@ -268,4 +272,22 @@ select:hover {
     justify-content: flex-end;
     gap: 12px;
     margin-top: 25px;
+}
+
+.modal-form-group {
+    margin-bottom: 15px;
+    text-align: left;
+}
+
+.modal-form-group label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #4B5563;
+    margin-bottom: 5px;
+}
+
+textarea.modal-input {
+    resize: none;
+    font-family: inherit;
 }
