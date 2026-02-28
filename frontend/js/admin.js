@@ -36,12 +36,70 @@ function generateDistinctColor(name) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    console.log("Скриптът е зареден и DOM е готов!");
+
     // Първоначално зареждане на всичко от сървъра
     loadAllData();
     
     // Инициализиране на бутоните за модални прозорци
     initAddClass();
     initAddSubject();
+
+    // Закачане на събития за основните бутони и контроли
+    const classSelect = document.getElementById('class-select-admin');
+    if (classSelect) {
+        classSelect.addEventListener('change', (e) => {
+            updateTeacherDisplay(e.target.value);
+        });
+    }
+
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', () => {
+            if(confirm("Изход?")) window.location.href = "index.html";
+        });
+    }
+
+    const btnGenerate = document.getElementById('btn-generate');
+    if (btnGenerate) {
+        btnGenerate.addEventListener('click', async (event) => {
+            event.preventDefault(); 
+            
+            console.log("Кликна 'Генерирай'!");
+            
+            const selectedClass = document.getElementById('class-select-admin').value;
+            if (!selectedClass) {
+                alert("Моля, изберете клас първо!");
+                return;
+            }
+
+            const originalText = btnGenerate.innerHTML;
+            btnGenerate.innerHTML = "⏳ Генериране...";
+            btnGenerate.disabled = true;
+
+            try {
+                console.log("Изпращане на заявка към сървъра за клас:", selectedClass);
+                const response = await fetch(`http://localhost:8080/api/schedule/generate/${selectedClass}`, {
+                    method: 'POST' 
+                });
+
+                if (response.ok) {
+                    const generatedData = await response.json();
+                    visualizeGeneratedSchedule(generatedData);
+                } else {
+                    const errText = await response.text();
+                    alert("Грешка при генериране от сървъра! " + errText);
+                    console.error("Сървърът върна статус:", response.status);
+                }
+            } catch (error) {
+                console.error("Мрежова грешка при генериране:", error);
+                alert("Няма връзка със сървъра!");
+            } finally {
+                btnGenerate.innerHTML = originalText;
+                btnGenerate.disabled = false;
+            }
+        });
+    }
 });
 
 async function loadAllData() {
@@ -52,6 +110,9 @@ async function loadAllData() {
         loadTeachersFromDatabase(),
         loadRoomsFromDatabase()
     ]);
+    // Рендерираме таблицата едва след като ВСИЧКО е заредено
+    console.log("Всички данни от сървъра са заредени. Рендериране на таблицата...");
+    renderScheduleTable();
 }
 
 // ==========================================
@@ -93,8 +154,6 @@ async function loadTeachersFromDatabase() {
             name: t.name,
             subjects: t.subjects ? t.subjects.map(s => s.subjectName || s.name) : []
         }));
-        
-        renderScheduleTable(); 
     } catch (e) { 
         console.error("Грешка при учители:", e); 
     }
@@ -105,7 +164,6 @@ async function loadRoomsFromDatabase() {
         const response = await fetch('http://localhost:8080/api/rooms');
         const data = await response.json();
         db.rooms = data.map(r => r.roomId || r.name);
-        renderScheduleTable();
     } catch (e) { console.error("Грешка при стаи:", e); }
 }
 
@@ -131,10 +189,6 @@ function renderClasses() {
     }
 }
 
-// НОВО: Слушаме за смяна на класа от менюто
-document.getElementById('class-select-admin')?.addEventListener('change', (e) => {
-    updateTeacherDisplay(e.target.value);
-});
 function updateTeacherDisplay(classCode) {
     const teacherDisplay = document.getElementById('teacher-display');
     if (!teacherDisplay) return;
@@ -182,7 +236,6 @@ function renderScheduleTable() {
         
         const tdHour = document.createElement('td');
         tdHour.className = 'hour-col';
-        // Използваме innerHTML, за да сложим часа и времето на два отделни реда за по-добър вид
         tdHour.innerHTML = `
             <div style="font-weight: bold; margin-bottom: 4px; color: #4F46E5;">${i} час</div>
             <div style="font-size: 0.75rem; color: #6B7280; white-space: nowrap;">${classTimes[i-1]}</div>
@@ -288,7 +341,8 @@ function openModal(id) {
 function closeModal(id) {
     const m = document.getElementById(id);
     m.classList.remove('active');
-    m.querySelector('input').value = '';
+    const firstInput = m.querySelector('input');
+    if(firstInput) firstInput.value = '';
 }
 
 function initAddClass() {
@@ -299,10 +353,9 @@ function initAddClass() {
     document.querySelector('.btn-add-class')?.addEventListener('click', () => {
         selectTeacher.innerHTML = '<option value="">-- Изберете учител --</option>';
         
-        // ВАЖНО: Използваме t.id за стойност на опцията
         db.teachers.forEach(t => {
             const opt = document.createElement('option');
-            opt.value = t.id; // <--- Тук трябва да е ID-то от базата (напр. 2 за Ани Илиева)
+            opt.value = t.id;
             opt.textContent = t.name;
             selectTeacher.appendChild(opt);
         });
@@ -312,7 +365,7 @@ function initAddClass() {
 
     btnConfirm?.addEventListener('click', async () => {
         const classCodeVal = inputClassCode.value.trim();
-        const teacherIdVal = selectTeacher.value; // Трябва да е числото (ID)
+        const teacherIdVal = selectTeacher.value;
         
         if (classCodeVal && teacherIdVal) {
             try {
@@ -322,7 +375,7 @@ function initAddClass() {
                     body: JSON.stringify({
                         classCode: classCodeVal,
                         classTeacher: {
-                            id: parseInt(teacherIdVal) // <--- Изпращаме само ID-то
+                            id: parseInt(teacherIdVal)
                         }
                     })
                 });
@@ -346,6 +399,7 @@ function initAddClass() {
         }
     });
 }
+
 function initAddSubject() {
     const btnConfirm = document.getElementById('confirm-add-subject');
     const inputName = document.getElementById('input-new-subject');
@@ -376,7 +430,6 @@ function initAddSubject() {
                 if (response.ok) {
                     const savedSubject = await response.json();
                     
-                    // Добавяме в локалния db обект
                     db.subjects.push({ 
                         id: savedSubject.subjectId, 
                         name: savedSubject.subjectName, 
@@ -386,7 +439,6 @@ function initAddSubject() {
                     renderSubjectsSidebar();
                     closeModal('modal-add-subject');
                     
-                    // Изчистване на полетата
                     inputName.value = '';
                     inputDesc.value = '';
                     selectType.selectedIndex = 0;
@@ -402,38 +454,101 @@ function initAddSubject() {
     });
 }
 
-// Изход
-document.getElementById('logoutBtn')?.addEventListener('click', () => {
-    if(confirm("Изход?")) window.location.href = "index.html";
-});
 
-document.getElementById('btn-generate')?.addEventListener('click', async () => {
-    const selectedClass = document.getElementById('class-select-admin').value;
-    if (!selectedClass) {
-        alert("Моля, изберете клас първо!");
-        return;
-    }
+// ==========================================
+// 6. ВИЗУАЛИЗАЦИЯ НА ГЕНЕРИРАНАТА ПРОГРАМА
+// ==========================================
 
-    const btn = document.getElementById('btn-generate');
-    const originalText = btn.innerHTML;
-    btn.innerHTML = "⏳ Генериране...";
-    btn.disabled = true;
+function visualizeGeneratedSchedule(scheduleData) {
+    console.log("Получени данни от сървъра за визуализация:", scheduleData);
+    
+    // 1. Изчистваме старата програма от таблицата
+    clearScheduleTable();
 
-    try {
-        const response = await fetch(`http://localhost:8080/api/schedule/generate/${selectedClass}`, {
-            method: 'POST'
-        });
+    // 2. Речник за превод на дните 
+    const dayMapping = {
+        "monday": "mon",
+        "tuesday": "tue",
+        "wednesday": "wed",
+        "thursday": "thu",
+        "friday": "fri"
+    };
 
-        if (response.ok) {
-            const generatedData = await response.json();
-            visualizeGeneratedSchedule(generatedData);
-        } else {
-            alert("Грешка при генериране от сървъра!");
+    // 3. Обхождаме получения JSON
+    if (typeof scheduleData === 'object' && !Array.isArray(scheduleData)) {
+        for (const [backendDay, slots] of Object.entries(scheduleData)) {
+            const frontendDay = dayMapping[backendDay.toLowerCase()];
+            if (!frontendDay || !Array.isArray(slots)) continue;
+
+            slots.forEach((slot, index) => {
+                const period = index + 1; 
+                const cell = document.querySelector(`td[data-slot="${frontendDay}-${period}"]`);
+
+                if (cell && slot && slot.subject && slot.subject.subjectName) {
+                    const subjectName = slot.subject.subjectName;
+                    
+                    let localSubject = db.subjects.find(s => s.name === subjectName);
+                    if (!localSubject) {
+                        localSubject = { name: subjectName, color: generateDistinctColor(subjectName) };
+                    }
+
+                    applySubjectToCell(cell, localSubject);
+
+                    const teacherSelect = cell.querySelector('.teacher-select');
+                    const roomSelect = cell.querySelector('.room-select');
+
+                    // Попълване на учителя
+                    if (slot.teacher && slot.teacher.name) {
+                        if (!Array.from(teacherSelect.options).some(opt => opt.value === slot.teacher.name)) {
+                             const opt = document.createElement('option');
+                             opt.value = slot.teacher.name;
+                             opt.textContent = slot.teacher.name;
+                             teacherSelect.appendChild(opt);
+                        }
+                        teacherSelect.value = slot.teacher.name;
+                    }
+
+                    // Попълване на стаята
+                    if (slot.room) {
+                        const roomVal = slot.room.name || slot.room.roomId.toString();
+                        if (!Array.from(roomSelect.options).some(opt => opt.value == roomVal)) {
+                             const opt = document.createElement('option');
+                             opt.value = roomVal;
+                             opt.textContent = roomVal;
+                             roomSelect.appendChild(opt);
+                        }
+                        roomSelect.value = roomVal;
+                    }
+                }
+            });
         }
-    } catch (error) {
-        console.error("Мрежова грешка:", error);
-    } finally {
-        btn.innerHTML = originalText;
-        btn.disabled = false;
+    } else if (Array.isArray(scheduleData)) {
+        console.error("Сървърът върна масив, а не обект с дни! Проверете структурата в конзолата.");
+        alert("Грешен формат на данните от сървъра. Отворете конзолата (F12) за повече инфо.");
     }
-});
+}
+
+function clearScheduleTable() {
+    document.querySelectorAll('.drop-zone').forEach(cell => {
+        const contentBox = cell.querySelector('.cell-content');
+        const title = cell.querySelector('.cell-subject-title');
+        const emptyHint = cell.querySelector('.empty-hint');
+        const teacherSelect = cell.querySelector('.teacher-select');
+        const roomSelect = cell.querySelector('.room-select');
+
+        contentBox.classList.remove('filled');
+        contentBox.style.backgroundColor = '';
+        title.style.display = 'none';
+        title.textContent = '';
+        emptyHint.style.display = 'block';
+        
+        teacherSelect.innerHTML = '<option value="">Учител</option>';
+        roomSelect.innerHTML = '<option value="">Стая</option>';
+        
+        db.rooms.forEach(room => {
+            const opt = document.createElement('option');
+            opt.value = room; opt.textContent = room;
+            roomSelect.appendChild(opt);
+        });
+    });
+}

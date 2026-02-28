@@ -37,7 +37,7 @@
                             <button class="btn-secondary btn-add-class" style="padding: 10px 15px;">+ Добави клас</button>
                         </p>
                     </div>
-                   <button class="btn-secondary btn-generate">🪄 Генерирай</button>
+                    <button type = "button" id="btn-generate" class="btn-secondary btn-generate">🪄 Генерирай</button>
                     <button class="btn-primary save-btn-top">Запази всичко</button>
                 </div>
 
@@ -46,8 +46,6 @@
                     <div style="text-align: right; margin-bottom: 10px; font-weight: bold; color: #555; padding-right: 15px;">
                         <span id="teacher-display"></span>
                     </div>
-
-                    <table class="admin-schedule-table">
 
                     <table class="admin-schedule-table">
                         <thead>
@@ -82,12 +80,13 @@
 
         </div>
     </main>
+
     <div id="modal-add-class" class="modal-overlay">
         <div class="modal-box">
             <h3>Добави нов клас</h3>
             
             <div class="modal-form-group">
-                <label>Име на класа (напр. 12Б):</label>
+                <label>Име на класа (напр. 261):</label>
                 <input type="text" id="input-new-class" class="modal-input" placeholder="Име на клас...">
             </div>
 
