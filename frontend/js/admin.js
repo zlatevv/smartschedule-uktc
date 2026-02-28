@@ -84,6 +84,7 @@ async function loadTeachersFromDatabase() {
         const data = await response.json();
         
         db.teachers = data.map(t => ({
+            id: t.id || t.teacherId || t.teacher_id, 
             name: t.name,
             subjects: t.subjects ? t.subjects.map(s => s.subjectName || s.name) : []
         }));
