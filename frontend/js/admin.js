@@ -9,6 +9,8 @@ const db = {
     rooms: []
 };
 
+let allSavedClasses = [];
+
 const classTimes = [
     "08:00 - 08:45", // 1 час
     "09:05 - 09:50", // 2 час
@@ -73,6 +75,9 @@ async function loadClassesFromDatabase() {
     try {
         const response = await fetch('http://localhost:8080/api/classes');
         const data = await response.json();
+        
+        allSavedClasses = data;
+
         db.classes = data.map(cls => cls.classCode);
         renderClasses();
     } catch (e) { console.error("Грешка при класове:", e); }
@@ -111,6 +116,7 @@ async function loadRoomsFromDatabase() {
 function renderClasses() {
     const select = document.getElementById('class-select-admin');
     if (!select) return;
+    
     select.innerHTML = '';
     db.classes.forEach(cls => {
         const option = document.createElement('option');
@@ -118,6 +124,28 @@ function renderClasses() {
         option.textContent = cls;
         select.appendChild(option);
     });
+
+    // Автоматично показваме учителя на първия клас при зареждане
+    if (select.value) {
+        updateTeacherDisplay(select.value);
+    }
+}
+
+// НОВО: Слушаме за смяна на класа от менюто
+document.getElementById('class-select-admin')?.addEventListener('change', (e) => {
+    updateTeacherDisplay(e.target.value);
+});
+function updateTeacherDisplay(classCode) {
+    const teacherDisplay = document.getElementById('teacher-display');
+    if (!teacherDisplay) return;
+
+    const foundClass = allSavedClasses.find(c => c.classCode === classCode);
+
+    if (foundClass && foundClass.classTeacher && foundClass.classTeacher.name) {
+        teacherDisplay.textContent = `Класен ръководител: ${foundClass.classTeacher.name}`;
+    } else {
+        teacherDisplay.textContent = '';
+    }
 }
 
 function renderSubjectsSidebar() {
@@ -377,4 +405,35 @@ function initAddSubject() {
 // Изход
 document.getElementById('logoutBtn')?.addEventListener('click', () => {
     if(confirm("Изход?")) window.location.href = "index.html";
+});
+
+document.getElementById('btn-generate')?.addEventListener('click', async () => {
+    const selectedClass = document.getElementById('class-select-admin').value;
+    if (!selectedClass) {
+        alert("Моля, изберете клас първо!");
+        return;
+    }
+
+    const btn = document.getElementById('btn-generate');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = "⏳ Генериране...";
+    btn.disabled = true;
+
+    try {
+        const response = await fetch(`http://localhost:8080/api/schedule/generate/${selectedClass}`, {
+            method: 'POST'
+        });
+
+        if (response.ok) {
+            const generatedData = await response.json();
+            visualizeGeneratedSchedule(generatedData);
+        } else {
+            alert("Грешка при генериране от сървъра!");
+        }
+    } catch (error) {
+        console.error("Мрежова грешка:", error);
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
 });

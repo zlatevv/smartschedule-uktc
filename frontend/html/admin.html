@@ -27,7 +27,6 @@
 
     <main class="admin-main" style="padding: 30px;">
         <div class="admin-layout-container">
-            
             <div class="section-box admin-full-width" style="margin: 0; flex-grow: 1;">
                 <div class="admin-header-flex">
                     <div>
@@ -38,10 +37,18 @@
                             <button class="btn-secondary btn-add-class" style="padding: 10px 15px;">+ Добави клас</button>
                         </p>
                     </div>
+                   <button class="btn-secondary btn-generate">🪄 Генерирай</button>
                     <button class="btn-primary save-btn-top">Запази всичко</button>
                 </div>
 
                 <div class="admin-table-wrapper">
+    
+                    <div style="text-align: right; margin-bottom: 10px; font-weight: bold; color: #555; padding-right: 15px;">
+                        <span id="teacher-display"></span>
+                    </div>
+
+                    <table class="admin-schedule-table">
+
                     <table class="admin-schedule-table">
                         <thead>
                             <tr>

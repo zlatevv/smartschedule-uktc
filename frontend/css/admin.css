@@ -291,3 +291,13 @@ textarea.modal-input {
     resize: none;
     font-family: inherit;
 }
+
+.btn-generate {
+    background-color: #10B981; 
+    color: white; 
+    border-color: #10B981; 
+    padding: 12px 24px; 
+    font-size: 1.1rem; 
+    font-weight: bold; 
+    box-shadow: 0 4px 6px rgba(16, 185, 129, 0.3);
+}
