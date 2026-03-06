@@ -1,10 +1,13 @@
 package com.zlatev.smartschedule.controller;
 
-import com.zlatev.smartschedule.service.ScheduleGeneratorService;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.zlatev.smartschedule.entity.Subject;
+import com.zlatev.smartschedule.service.CurriculumService;
+import com.zlatev.smartschedule.service.ScheduleDatabaseService;
+import com.zlatev.smartschedule.service.ScheduleGeneratorAlgorithm;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -12,9 +15,16 @@ import java.util.Map;
 @RequestMapping("/api/schedule")
 @CrossOrigin(origins = "*") // Това оправя CORS грешката!
 public class ScheduleController {
+    private final ScheduleGeneratorAlgorithm scheduleGeneratorService;
+    private final ScheduleDatabaseService scheduleDatabaseService;
+    private final CurriculumService curriculumService;
 
-    @Autowired
-    private ScheduleGeneratorService scheduleGeneratorService;
+    public ScheduleController(ScheduleGeneratorAlgorithm scheduleGeneratorService, ScheduleDatabaseService scheduleDatabaseService, CurriculumService curriculumService) {
+        this.scheduleGeneratorService = scheduleGeneratorService;
+        this.scheduleDatabaseService = scheduleDatabaseService;
+        this.curriculumService = curriculumService;
+    }
+
 
     // 1. Методът за генериране на ЕДИН конкретен клас (както работи в момента JS-ът ти)
     @PostMapping("/generate/{classCode}")
@@ -42,18 +52,35 @@ public class ScheduleController {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
-
-    // 3. ЕТО ГО ЛИПСВАЩИЯТ МЕТОД ЗА ЗАПАЗВАНЕ!
     @PostMapping("/save")
     public ResponseEntity<?> saveSchedule(@RequestBody List<Map<String, Object>> scheduleData) {
         System.out.println("====== ПОЛУЧЕНА ЗАЯВКА ЗА ЗАПАЗВАНЕ ======");
         try {
-            // Предаваме данните на Service-а, за да ги обработи и запише
-            scheduleGeneratorService.saveManualSchedule(scheduleData);
+            scheduleDatabaseService.saveManualSchedule(scheduleData);
             return ResponseEntity.ok("Програмата е запазена успешно в базата!");
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.badRequest().body("Грешка при запазване: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/class/{classCode}")
+    public ResponseEntity<?> getScheduleForClass(@PathVariable String classCode) {
+        System.out.println("====== ИЗТЕГЛЯНЕ НА ПРОГРАМА ЗА КЛАС: " + classCode + " ======");
+        try {
+            Map<Subject, Integer> schedule = curriculumService.getCurriculumForClass(classCode);
+
+            Map<String, Integer> formattedSchedule = new HashMap<>();
+
+            for (Map.Entry<Subject, Integer> entry : schedule.entrySet()) {
+                String subjectName = entry.getKey().getSubjectName();
+                formattedSchedule.put(subjectName, entry.getValue());
+            }
+
+            return ResponseEntity.ok(formattedSchedule);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body("Грешка: " + e.getMessage());
         }
     }
 }
