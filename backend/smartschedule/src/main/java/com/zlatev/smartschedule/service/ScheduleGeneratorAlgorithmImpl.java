@@ -32,16 +32,13 @@ public class ScheduleGeneratorAlgorithmImpl implements ScheduleGeneratorAlgorith
 
     @Override
     public Map<String, Object> generateScheduleForClass(String classCode) {
-        System.out.println("Генериране на умна програма за клас " + classCode);
+        // Този метод се вика от фронтенда, ако генерираме само 1 конкретен клас
+        System.out.println("Генериране на програма само за клас " + classCode);
 
-        List<Teacher> allTeachers = teacherRepository.findAll();
-        List<Room> allRooms = roomRepository.findAll();
-        Map<Subject, Integer> curriculum = curriculumService.getCurriculumForClass(classCode);
-
-        List<TimetableRecord> allExistingRecords = timetableRecordRepository.findAll();
         Map<String, Set<Long>> busyTeacherIds = new HashMap<>();
         Map<String, Set<Integer>> busyRoomIds = new HashMap<>();
 
+        List<TimetableRecord> allExistingRecords = timetableRecordRepository.findAll();
         for (TimetableRecord record : allExistingRecords) {
             if (record.getClassCode().equals(classCode)) {
                 continue;
@@ -56,41 +53,53 @@ public class ScheduleGeneratorAlgorithmImpl implements ScheduleGeneratorAlgorith
             }
         }
 
-        ScheduleSlot[][] grid = new ScheduleSlot[5][7];
+        return generateScheduleForClassInternal(classCode, busyTeacherIds, busyRoomIds);
+    }
+
+    // ВЪТРЕШЕН МЕТОД: Тук става магията. Той приема паметта и работи директно с нея!
+    private Map<String, Object> generateScheduleForClassInternal(String classCode, Map<String, Set<Long>> busyTeacherIds, Map<String, Set<Integer>> busyRoomIds) {
+        List<Teacher> allTeachers = teacherRepository.findAll();
+        List<Room> allRooms = roomRepository.findAll();
+
+        Map<Subject, Integer> curriculum = new HashMap<>(curriculumService.getCurriculumForClass(classCode));
+
+        Grade currentGrade = gradeRepository.findAll().stream()
+                .filter(g -> g.getClassCode().equals(classCode))
+                .findFirst()
+                .orElse(null);
+
+        Teacher homeroomTeacher = (currentGrade != null) ? currentGrade.getClassTeacher() : null;
+
+        ScheduleSlot[][] grid = new ScheduleSlot[5][8];
         int[] hoursPerDay = new int[5];
 
         Subject homeroomSubject = null;
         for (Subject s : curriculum.keySet()) {
-            if (s.getSubjectId() == 49) {
+            if (s.getSubjectName().trim().equalsIgnoreCase("Час На Класа")) {
                 homeroomSubject = s;
                 break;
             }
         }
 
-        if (homeroomSubject != null) {
-            Teacher homeroomTeacher = resourceAllocationService.findAvailableTeacher(homeroomSubject, allTeachers, 0, 6, 1, busyTeacherIds);
+        if (homeroomSubject != null && homeroomTeacher != null) {
             Room homeroomRoom = resourceAllocationService.findAvailableRoom(homeroomSubject, allRooms, 0, 6, 1, busyRoomIds);
 
-            // ЗАЩИТА: Проверяваме дали сме намерили учител и стая!
-            if (homeroomTeacher != null && homeroomRoom != null) {
+            if (homeroomRoom != null) {
                 grid[0][6] = new ScheduleSlot(homeroomSubject, homeroomTeacher, homeroomRoom);
                 busyTeacherIds.computeIfAbsent("0-6", k -> new HashSet<>()).add((long) homeroomTeacher.getId());
                 busyRoomIds.computeIfAbsent("0-6", k -> new HashSet<>()).add(homeroomRoom.getRoomId());
 
                 curriculum.remove(homeroomSubject);
-                System.out.println("✅ Час на класа е заложен успешно в Понеделник 7-ми час.");
-            } else {
-                System.out.println("⚠️ ВНИМАНИЕ: Не е намерен свободен учител или стая за Час на класа в Понеделник 7-ми час!");
+                System.out.println("✅ Час на класа е заложен в Понеделник 7-ми час за " + classCode);
             }
         }
+
         List<Map.Entry<Subject, Integer>> sortedSubjects = new ArrayList<>(curriculum.entrySet());
         sortedSubjects.sort((a, b) -> b.getValue().compareTo(a.getValue()));
 
-        // 4. Разполагаме предметите
         for (Map.Entry<Subject, Integer> entry : sortedSubjects) {
             Subject subject = entry.getKey();
             int remainingHours = entry.getValue();
-
             boolean allowMultiplePerDay = remainingHours > 5;
 
             while (remainingHours > 0) {
@@ -114,7 +123,6 @@ public class ScheduleGeneratorAlgorithmImpl implements ScheduleGeneratorAlgorith
             }
         }
 
-        // 5. Конвертираме към Map за фронтенда
         String[] days = {"Monday", "Tuesday", "Wednesday", "Thursday", "Friday"};
         Map<String, Object> weeklySchedule = new LinkedHashMap<>();
 
@@ -130,16 +138,25 @@ public class ScheduleGeneratorAlgorithmImpl implements ScheduleGeneratorAlgorith
     @Transactional
     public void generateAndSaveAllClasses() {
         System.out.println("Стартиране на масово генериране за всички класове...");
+        timetableRecordRepository.deleteAllInBatch();
 
-        timetableRecordRepository.deleteAll();
+        try {
+            timetableRecordRepository.resetAutoIncrement();
+        } catch (Exception e) {
+            System.out.println("⚠️ Внимание: Неуспешно ресетиране на брояча, продължаваме...");
+        }
 
         List<String> allClasses = gradeRepository.findAll().stream()
                 .map(Grade::getClassCode)
                 .sorted(Collections.reverseOrder())
                 .toList();
 
+        // Глобалната памет срещу дублиране
+        Map<String, Set<Long>> globalBusyTeacherIds = new HashMap<>();
+        Map<String, Set<Integer>> globalBusyRoomIds = new HashMap<>();
+
         for (String classCode : allClasses) {
-            Map<String, Object> classSchedule = generateScheduleForClass(classCode);
+            Map<String, Object> classSchedule = generateScheduleForClassInternal(classCode, globalBusyTeacherIds, globalBusyRoomIds);
 
             scheduleDatabaseService.saveClassScheduleToDatabase(classCode, classSchedule);
         }
@@ -151,13 +168,12 @@ public class ScheduleGeneratorAlgorithmImpl implements ScheduleGeneratorAlgorith
     public boolean placeBlockWithoutGaps(ScheduleSlot[][] grid, int[] hoursPerDay, Subject subject, int duration, boolean allowMultiple, List<Teacher> allTeachers, List<Room> allRooms, Map<String, Set<Long>> busyTeacherIds, Map<String, Set<Integer>> busyRoomIds) {
         List<Integer> days = Arrays.asList(0, 1, 2, 3, 4);
         Collections.shuffle(days);
-        days.sort(Comparator.comparingInt(d -> hoursPerDay[d])); // Избираме най-празния ден
+        days.sort(Comparator.comparingInt(d -> hoursPerDay[d]));
 
         for (int day : days) {
-            int maxPeriodsForDay = (day == 0) ? 6 : 7;
+            int maxPeriodsForDay = 8;
 
             if (hoursPerDay[day] + duration <= maxPeriodsForDay) {
-
                 if (!allowMultiple && hasSubjectOnDay(grid[day], subject)) {
                     continue;
                 }
@@ -176,6 +192,7 @@ public class ScheduleGeneratorAlgorithmImpl implements ScheduleGeneratorAlgorith
                     grid[day][currentPeriod] = new ScheduleSlot(subject, availableTeacher, availableRoom);
 
                     String timeKey = day + "-" + currentPeriod;
+                    // ТУК Е МАГИЯТА: Паметта се обновява на секундата!
                     busyTeacherIds.computeIfAbsent(timeKey, k -> new HashSet<>()).add((long) availableTeacher.getId());
                     busyRoomIds.computeIfAbsent(timeKey, k -> new HashSet<>()).add(availableRoom.getRoomId());
                 }
@@ -184,7 +201,6 @@ public class ScheduleGeneratorAlgorithmImpl implements ScheduleGeneratorAlgorith
                 return true;
             }
         }
-
         return false;
     }
 

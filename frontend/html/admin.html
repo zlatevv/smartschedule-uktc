@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="/frontend/css/layout.css">
     <link rel="stylesheet" href="/frontend/css/variables.css">
     <link rel="stylesheet" href="/frontend/css/admin.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 <body>
 
@@ -38,7 +39,7 @@
                         </p>
                     </div>
                     <button type = "button" id="btn-generate" class="btn-secondary btn-generate">🪄 Генерирай</button>
-                    <button class="btn-primary save-btn-top">Запази всичко</button>
+                    <button class="btn-primary save-btn-top">Експортирай в PDF</button>
                 </div>
 
                 <div class="admin-table-wrapper">
@@ -134,7 +135,11 @@
             </div>
         </div>
     </div>
-    
+
+    <script src="/frontend/js/global.js"></script>
+    <script src="/frontend/js/api.js"></script>
+    <script src="/frontend/js/pdf.js"></script>
+    <script src="/frontend/js/app.js"></script>
     <script src="/frontend/js/admin.js"></script>
 </body>
 </html>
