@@ -44,8 +44,7 @@ public class ScheduleController {
     public ResponseEntity<?> generateAll() {
         System.out.println("====== ГЕНЕРИРАНЕ НА ВСИЧКИ КЛАСОВЕ ======");
         try {
-            // Тук извикваш твоя метод от Service, който върти цикъла за всички класове
-            // scheduleGeneratorService.generateAndSaveAllClasses();
+            scheduleGeneratorService.generateAndSaveAllClasses();
             return ResponseEntity.ok(Map.of("message", "Програмата за всички класове е готова!"));
         } catch (Exception e) {
             e.printStackTrace();
@@ -68,16 +67,8 @@ public class ScheduleController {
     public ResponseEntity<?> getScheduleForClass(@PathVariable String classCode) {
         System.out.println("====== ИЗТЕГЛЯНЕ НА ПРОГРАМА ЗА КЛАС: " + classCode + " ======");
         try {
-            Map<Subject, Integer> schedule = curriculumService.getCurriculumForClass(classCode);
-
-            Map<String, Integer> formattedSchedule = new HashMap<>();
-
-            for (Map.Entry<Subject, Integer> entry : schedule.entrySet()) {
-                String subjectName = entry.getKey().getSubjectName();
-                formattedSchedule.put(subjectName, entry.getValue());
-            }
-
-            return ResponseEntity.ok(formattedSchedule);
+            Map<String, Object> schedule = scheduleGeneratorService.generateScheduleForClass(classCode);
+            return ResponseEntity.ok(schedule);
         } catch (Exception e) {
             e.printStackTrace();
             return ResponseEntity.badRequest().body("Грешка: " + e.getMessage());
