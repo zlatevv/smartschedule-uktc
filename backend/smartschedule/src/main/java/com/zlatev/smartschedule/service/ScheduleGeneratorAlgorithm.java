@@ -12,8 +12,9 @@ import java.util.Set;
 public interface ScheduleGeneratorAlgorithm {
     Map<String, Object> generateScheduleForClass(String classCode);
     void generateAndSaveAllClasses();
-    boolean placeBlockWithoutGaps(ScheduleSlot[][] grid, int[] hoursPerDay, Subject subject, int duration, boolean allowMultiple,
-                                  List<Teacher> allTeachers, List<Room> allRooms,
-                                  Map<String, Set<Long>> busyTeacherIds, Map<String, Set<Integer>> busyRoomIds);
     boolean hasSubjectOnDay(ScheduleSlot[] daySchedule, Subject subject);
+    boolean placeBlockWithoutGaps(ScheduleSlot[][] grid, int[] hoursPerDay, Subject subject, int duration,
+                                  int maxAllowedPerDay, List<Teacher> allTeachers, List<Room> allRooms,
+                                  Map<String, Set<Integer>> busyTeacherIds, Map<String, Set<Integer>> busyRoomIds,
+                                  Map<Subject, Teacher> classAssignedTeachers, int maxPeriodsForDay);
 }

@@ -10,5 +10,6 @@ import java.util.Set;
 
 public interface ResourceAllocationService {
     Room findAvailableRoom(Subject subject, List<Room> allRooms, int day, int startPeriod, int duration, Map<String, Set<Integer>> busyRoomIds);
-    Teacher findAvailableTeacher(Subject subject, List<Teacher> allTeachers, int day, int startPeriod, int duration, Map<String, Set<Long>> busyTeacherIds);
+    Teacher findAvailableTeacher(Subject subject, List<Teacher> allTeachers, int day, int startPeriod,
+                                 int duration, Map<String, Set<Integer>> busyTeacherIds);
 }

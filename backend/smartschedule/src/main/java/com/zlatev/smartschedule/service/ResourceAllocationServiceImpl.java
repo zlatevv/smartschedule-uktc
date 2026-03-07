@@ -50,7 +50,9 @@ public class ResourceAllocationServiceImpl implements ResourceAllocationService 
     }
 
     @Override
-    public Teacher findAvailableTeacher(Subject subject, List<Teacher> allTeachers, int day, int startPeriod, int duration, Map<String, Set<Long>> busyTeacherIds) {
+    public Teacher findAvailableTeacher(Subject subject, List<Teacher> allTeachers, int day,
+                                        int startPeriod, int duration,
+                                        Map<String, Set<Integer>> busyTeacherIds) {
         return allTeachers.stream()
                 .filter(t -> t.getSubjects().stream().anyMatch(s -> s.getSubjectId() == subject.getSubjectId()))
                 .filter(t -> {
