@@ -6,4 +6,6 @@ import java.util.Map;
 public interface ScheduleDatabaseService {
     void saveClassScheduleToDatabase(String classCode, Map<String, Object> classSchedule);
     void saveManualSchedule(List<Map<String, Object>> scheduleData);
+
+    Map<String, Object> getClassSchedule(String classCode);
 }

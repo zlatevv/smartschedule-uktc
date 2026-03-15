@@ -8,9 +8,7 @@ import com.zlatev.smartschedule.repository.TimetableRecordRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Service
 public class ScheduleDatabaseServiceImpl implements ScheduleDatabaseService {
@@ -64,13 +62,7 @@ public class ScheduleDatabaseServiceImpl implements ScheduleDatabaseService {
         if (scheduleData == null || scheduleData.isEmpty()) {
             return;
         }
-
-        // 1. Взимаме кода на класа (напр. "8а") от първия запис
         String classCode = scheduleData.get(0).get("classCode").toString();
-
-        // (По желание) Тук е хубаво да изтриеш старата програма на този клас,
-        // за да не се дублират часовете при повторно запазване:
-        // timetableRecordRepository.deleteByClassCode(classCode);
 
         List<TimetableRecord> recordsToSave = new ArrayList<>();
 
@@ -86,7 +78,6 @@ public class ScheduleDatabaseServiceImpl implements ScheduleDatabaseService {
                 subjectRepository.findBySubjectName(subjectName).ifPresent(record::setSubject);
             }
 
-            // 4. Търсим Учителя по име
             String teacherName = (String) data.get("teacherName");
             if (teacherName != null && !teacherName.isEmpty()) {
                 teacherRepository.findByName(teacherName).ifPresent(record::setTeacher);
@@ -95,5 +86,36 @@ public class ScheduleDatabaseServiceImpl implements ScheduleDatabaseService {
             recordsToSave.add(record);
         }
         timetableRecordRepository.saveAll(recordsToSave);
+    }
+
+    @Override
+    public Map<String, Object> getClassSchedule(String classCode) {
+        List<TimetableRecord> records = timetableRecordRepository.findByClassCode(classCode);
+
+        String[] daysMap = {"Monday", "Tuesday", "Wednesday", "Thursday", "Friday"};
+        Map<String, Object> weeklySchedule = new LinkedHashMap<>();
+
+        for (String day : daysMap) {
+            List<ScheduleSlot> dailySlots = Arrays.asList(new ScheduleSlot[8]);
+            weeklySchedule.put(day, dailySlots);
+        }
+
+        for (TimetableRecord record : records) {
+            int dayInt = record.getDayOfWeek();
+            int period = record.getPeriod();
+
+            if (dayInt >= 0 && dayInt < 5 && period >= 0 && period < 8) {
+                String dayName = daysMap[dayInt];
+
+                @SuppressWarnings("unchecked")
+                List<ScheduleSlot> dailySlots = (List<ScheduleSlot>) weeklySchedule.get(dayName);
+
+                ScheduleSlot slot = new ScheduleSlot(record.getSubject(), record.getTeacher(), record.getRoom());
+
+                dailySlots.set(period, slot);
+            }
+        }
+
+        return weeklySchedule;
     }
 }

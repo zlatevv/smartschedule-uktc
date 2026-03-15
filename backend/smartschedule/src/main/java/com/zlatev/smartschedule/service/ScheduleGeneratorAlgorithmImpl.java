@@ -17,486 +17,442 @@ public class ScheduleGeneratorAlgorithmImpl implements ScheduleGeneratorAlgorith
     private final GradeRepository gradeRepository;
     private final TeacherRepository teacherRepository;
     private final RoomRepository roomRepository;
-    private final ResourceAllocationService resourceAllocationService;
     private final CurriculumService curriculumService;
     private final ScheduleDatabaseService scheduleDatabaseService;
 
-    public ScheduleGeneratorAlgorithmImpl(TimetableRecordRepository timetableRecordRepository, GradeRepository gradeRepository, TeacherRepository teacherRepository, RoomRepository roomRepository, ResourceAllocationService resourceAllocationService, CurriculumService curriculumService, ScheduleDatabaseService scheduleDatabaseService) {
+    public ScheduleGeneratorAlgorithmImpl(TimetableRecordRepository timetableRecordRepository, GradeRepository gradeRepository,
+                                          TeacherRepository teacherRepository, RoomRepository roomRepository,
+                                          CurriculumService curriculumService, ScheduleDatabaseService scheduleDatabaseService) {
         this.timetableRecordRepository = timetableRecordRepository;
         this.gradeRepository = gradeRepository;
         this.teacherRepository = teacherRepository;
         this.roomRepository = roomRepository;
-        this.resourceAllocationService = resourceAllocationService;
         this.curriculumService = curriculumService;
         this.scheduleDatabaseService = scheduleDatabaseService;
     }
 
-    @Override
-    public Map<String, Object> generateScheduleForClass(String classCode) {
-        System.out.println("Генериране на програма само за клас " + classCode);
+    private static class Course {
+        String classCode;
+        Subject subject;
+        Teacher teacher;
+        int totalHours;
+        int remainingHours;
 
-        Map<String, Set<Integer>> busyTeacherIds = new HashMap<>();
-        Map<String, Set<Integer>> busyRoomIds = new HashMap<>();
-
-        List<TimetableRecord> allExistingRecords = timetableRecordRepository.findAll();
-        for (TimetableRecord record : allExistingRecords) {
-            if (record.getClassCode().equals(classCode)) {
-                continue;
-            }
-            String timeKey = record.getDayOfWeek() + "-" + record.getPeriod();
-
-            if (record.getTeacher() != null) {
-                busyTeacherIds.computeIfAbsent(timeKey, k -> new HashSet<>()).add(record.getTeacher().getId());
-            }
-            if (record.getRoom() != null) {
-                busyRoomIds.computeIfAbsent(timeKey, k -> new HashSet<>()).add(record.getRoom().getRoomId());
-            }
+        Course(String classCode, Subject subject, int hours) {
+            this.classCode = classCode;
+            this.subject = subject;
+            this.totalHours = hours;
+            this.remainingHours = hours;
         }
-
-        // Подаваме null за prefilledGrid, защото генерираме само един клас
-        return generateScheduleForClassInternal(classCode, busyTeacherIds, busyRoomIds, null);
     }
 
-    private Map<String, Object> generateScheduleForClassInternal(String classCode, Map<String, Set<Integer>> busyTeacherIds,
-                                                                 Map<String, Set<Integer>> busyRoomIds, ScheduleSlot[][] prefilledGrid) {
+    private Map<String, Map<String, Object>> generateAllSchedulesCore() {
+        System.out.println("🚀 Стартиране на генериране с БЛОК-ЧАСОВЕ (2 по 2)...");
+        timetableRecordRepository.deleteAllInBatch();
+        try { timetableRecordRepository.resetAutoIncrement(); } catch (Exception ignored) {}
+
+        List<Grade> allGrades = gradeRepository.findAll();
+        List<String> allClasses = allGrades.stream().map(Grade::getClassCode).toList();
         List<Teacher> allTeachers = teacherRepository.findAll();
         List<Room> allRooms = roomRepository.findAll();
 
-        Map<Subject, Integer> curriculum = new HashMap<>(curriculumService.getCurriculumForClass(classCode));
-        Map<Subject, Integer> originalCurriculum = new HashMap<>(curriculum);
-        Map<Subject, Teacher> classAssignedTeachers = new HashMap<>();
+        List<Course> allCourses = new ArrayList<>();
+        for (String classCode : allClasses) {
+            Map<Subject, Integer> curriculum = curriculumService.getCurriculumForClass(classCode);
+            for (Map.Entry<Subject, Integer> entry : curriculum.entrySet()) {
+                allCourses.add(new Course(classCode, entry.getKey(), entry.getValue()));
+            }
+        }
 
-        Grade currentGrade = gradeRepository.findAll().stream()
-                .filter(g -> g.getClassCode().equals(classCode))
-                .findFirst()
-                .orElse(null);
+        Map<Integer, Integer> teacherHours = new HashMap<>();
+        for (Teacher t : allTeachers) teacherHours.put(t.getId(), 0);
 
-        Teacher homeroomTeacher = (currentGrade != null) ? currentGrade.getClassTeacher() : null;
+        for (Course course : allCourses) {
+            List<Teacher> qualified = allTeachers.stream()
+                    .filter(t -> t.getSubjects().contains(course.subject))
+                    .toList();
 
-        // Ако имаме предварително запазени езици (Фаза 0), ползваме тях, иначе правим празен масив
-        ScheduleSlot[][] grid = (prefilledGrid != null) ? prefilledGrid : new ScheduleSlot[5][8];
-        int[] hoursPerDay = new int[5];
+            Teacher selectedTeacher = null;
+            for (Teacher t : qualified) {
+                if (teacherHours.get(t.getId()) + course.totalHours <= 24) {
+                    selectedTeacher = t;
+                    break;
+                }
+            }
 
-        // МНОГО ВАЖНО: Махаме от нужните часове тези, които вече сме сложили във Фаза 0
-        for (int d = 0; d < 5; d++) {
-            for (int p = 0; p < 8; p++) {
-                if (grid[d][p] != null) {
-                    Subject s1 = grid[d][p].getSubject();
-                    if (s1 != null && curriculum.containsKey(s1)) {
-                        curriculum.put(s1, curriculum.get(s1) - 1);
-                    }
-                    Subject s2 = grid[d][p].getSubject2(); // Ако е слят клас
-                    if (s2 != null && curriculum.containsKey(s2)) {
-                        curriculum.put(s2, curriculum.get(s2) - 1);
-                    }
+            if (selectedTeacher == null && !qualified.isEmpty()) {
+                selectedTeacher = qualified.stream()
+                        .min(Comparator.comparingInt(t -> teacherHours.get(t.getId())))
+                        .orElse(null);
+            }
+
+            if (selectedTeacher != null) {
+                course.teacher = selectedTeacher;
+                teacherHours.put(selectedTeacher.getId(), teacherHours.get(selectedTeacher.getId()) + course.totalHours);
+            }
+        }
+
+        Map<String, ScheduleSlot[][]> classSchedules = new HashMap<>();
+        Map<Integer, boolean[][]> teacherBusy = new HashMap<>();
+        Map<Integer, boolean[][]> roomBusy = new HashMap<>();
+
+        for (String classCode : allClasses) classSchedules.put(classCode, new ScheduleSlot[5][8]);
+        for (Teacher t : allTeachers) teacherBusy.put(t.getId(), new boolean[5][8]);
+        for (Room r : allRooms) roomBusy.put(r.getRoomId(), new boolean[5][8]);
+
+        // ФАЗА 0: Час на класа и Слети езици
+        for (String classCode : allClasses) {
+            Grade grade = allGrades.stream().filter(g -> g.getClassCode().equals(classCode)).findFirst().orElse(null);
+            Teacher homeroomTeacher = (grade != null) ? grade.getClassTeacher() : null;
+
+            Course homeroomCourse = allCourses.stream()
+                    .filter(c -> c.classCode.equals(classCode) && c.subject.getSubjectName().trim().equalsIgnoreCase("Час На Класа"))
+                    .findFirst().orElse(null);
+
+            if (homeroomCourse != null && homeroomTeacher != null) {
+                homeroomCourse.teacher = homeroomTeacher;
+                Room availableRoom = getAvailableRoom(allRooms, roomBusy, 0, 6);
+                if (availableRoom != null) {
+                    placeSlot(classSchedules, teacherBusy, roomBusy, homeroomCourse, availableRoom, 0, 6);
                 }
             }
         }
 
-        Subject homeroomSubject = null;
-        for (Subject s : curriculum.keySet()) {
-            if (s.getSubjectName().trim().equalsIgnoreCase("Час На Класа")) {
-                homeroomSubject = s;
-                break;
-            }
-        }
-
-        // ТВЪРДО ЗАДАВАНЕ НА ЧАСА НА КЛАСА ЗА ПОНЕДЕЛНИК 7-МИ ЧАС (Индекс 0, 6)
-        if (homeroomSubject != null && homeroomTeacher != null && grid[0][6] == null) {
-            Room homeroomRoom = resourceAllocationService.findAvailableRoom(homeroomSubject, allRooms, 0, 6, 1, busyRoomIds);
-
-            if (homeroomRoom != null) {
-                grid[0][6] = new ScheduleSlot(homeroomSubject, homeroomTeacher, homeroomRoom);
-                busyTeacherIds.computeIfAbsent("0-6", k -> new HashSet<>()).add(homeroomTeacher.getId());
-                busyRoomIds.computeIfAbsent("0-6", k -> new HashSet<>()).add(homeroomRoom.getRoomId());
-
-                classAssignedTeachers.put(homeroomSubject, homeroomTeacher);
-                curriculum.remove(homeroomSubject);
-                originalCurriculum.remove(homeroomSubject);
-                System.out.println("✅ Час на класа е заложен в Понеделник 7-ми час за " + classCode);
-            }
-        }
-
-        List<Map.Entry<Subject, Integer>> sortedSubjects = new ArrayList<>(curriculum.entrySet());
-        sortedSubjects.sort((a, b) -> b.getValue().compareTo(a.getValue()));
-
-        // --- ФАЗА 1: Строго подреждане без дупки (до 7-ми час, нормални лимити) ---
-        runPhase(grid, hoursPerDay, sortedSubjects, originalCurriculum, allTeachers, allRooms, busyTeacherIds, busyRoomIds, classAssignedTeachers, 7, 0, false);
-
-        // --- ФАЗА 2: Отпускане на лимита на ден (до 7-ми час, БЕЗ дупки) ---
-        runPhase(grid, hoursPerDay, sortedSubjects, originalCurriculum, allTeachers, allRooms, busyTeacherIds, busyRoomIds, classAssignedTeachers, 7, 2, false);
-
-        // --- ФАЗА 3: Позволяване на 8-ми час (БЕЗ дупки) ---
-        runPhase(grid, hoursPerDay, sortedSubjects, originalCurriculum, allTeachers, allRooms, busyTeacherIds, busyRoomIds, classAssignedTeachers, 8, 10, false);
-
-        // --- ФАЗА 4: Крайно спасяване (Позволява дупки, само при безизходица) ---
-        runPhase(grid, hoursPerDay, sortedSubjects, originalCurriculum, allTeachers, allRooms, busyTeacherIds, busyRoomIds, classAssignedTeachers, 8, 10, true);
-
-        for (Map.Entry<Subject, Integer> entry : sortedSubjects) {
-            if (entry.getValue() > 0) {
-                System.out.println("⚠️ Няма свободно място/учител/стая в програмата за: " + entry.getKey().getSubjectName() + " (Остават " + entry.getValue() + " часа) в клас " + classCode);
-            }
-        }
-
-        String[] days = {"Monday", "Tuesday", "Wednesday", "Thursday", "Friday"};
-        Map<String, Object> weeklySchedule = new LinkedHashMap<>();
-
-        for (int d = 0; d < 5; d++) {
-            List<ScheduleSlot> dailySlots = new ArrayList<>(Arrays.asList(grid[d]).subList(0, 8));
-            weeklySchedule.put(days[d], dailySlots);
-        }
-
-        return weeklySchedule;
-    }
-
-    @Override
-    @Transactional
-    public void generateAndSaveAllClasses() {
-        System.out.println("Стартиране на масово генериране за всички класове...");
-        timetableRecordRepository.deleteAllInBatch();
-
-        try {
-            timetableRecordRepository.resetAutoIncrement();
-        } catch (Exception e) {
-            System.out.println("⚠️ Внимание: Неуспешно ресетиране на брояча, продължаваме...");
-        }
-
-        List<String> allClasses = gradeRepository.findAll().stream()
-                .map(Grade::getClassCode)
-                .sorted((class1, class2) -> {
-                    int num1 = extractGradeNumber(class1);
-                    int num2 = extractGradeNumber(class2);
-
-                    int vipusk1 = num1 / 10;
-                    int paralelk1 = num1 % 10;
-                    int vipusk2 = num2 / 10;
-                    int paralelk2 = num2 % 10;
-
-                    if (vipusk1 != vipusk2) {
-                        return Integer.compare(vipusk2, vipusk1);
-                    }
-                    return Integer.compare(paralelk1, paralelk2);
-                })
-                .toList();
-
-        Map<String, Set<Integer>> globalBusyTeacherIds = new HashMap<>();
-        Map<String, Set<Integer>> globalBusyRoomIds = new HashMap<>();
-
-        // --- ФАЗА 0: Подготовка на предварителни графици за слетите паралелки ---
-        Map<String, ScheduleSlot[][]> prefilledGrids = new HashMap<>();
-        for (String classCode : allClasses) {
-            prefilledGrids.put(classCode, new ScheduleSlot[5][8]);
-        }
-
-        schedulePairedLanguagesPhaseZero(allClasses, prefilledGrids, globalBusyTeacherIds, globalBusyRoomIds);
-        // --- КРАЙ НА ФАЗА 0 ---
-
-        for (String classCode : allClasses) {
-            Map<String, Object> classSchedule = generateScheduleForClassInternal(classCode, globalBusyTeacherIds, globalBusyRoomIds, prefilledGrids.get(classCode));
-            scheduleDatabaseService.saveClassScheduleToDatabase(classCode, classSchedule);
-        }
-
-        System.out.println("✅ Масовото генериране и запазване приключи успешно!");
-    }
-
-    // --- ЛОГИКА ЗА ФАЗА 0 (СЛЕТИ ПАРАЛЕЛКИ) ---
-    private void schedulePairedLanguagesPhaseZero(List<String> allClasses, Map<String, ScheduleSlot[][]> prefilledGrids,
-                                                  Map<String, Set<Integer>> globalBusyTeacherIds, Map<String, Set<Integer>> globalBusyRoomIds) {
-        List<Teacher> allTeachers = teacherRepository.findAll();
-        List<Room> allRooms = roomRepository.findAll();
         Set<String> processedPairs = new HashSet<>();
-
         for (String class1 : allClasses) {
             String class2 = getPairedClassCode(class1);
             if (class2 == null || !allClasses.contains(class2)) continue;
 
-            // За да не обработваме 251-252, а после и 252-251
             String pairKey = (class1.compareTo(class2) < 0) ? class1 + "-" + class2 : class2 + "-" + class1;
             if (processedPairs.contains(pairKey)) continue;
             processedPairs.add(pairKey);
 
-            Map<Subject, Integer> curr1 = curriculumService.getCurriculumForClass(class1);
+            Course span1 = findCourseByKeyword(allCourses, class1, "Испански");
+            Course ger1 = findCourseByKeyword(allCourses, class1, "Немски");
+            Course span2 = findCourseByKeyword(allCourses, class2, "Испански");
+            Course ger2 = findCourseByKeyword(allCourses, class2, "Немски");
 
-            Subject spanish = findSubjectByKeyword(curr1.keySet(), "Испански");
-            Subject german = findSubjectByKeyword(curr1.keySet(), "Немски");
+            if (span1 == null || ger1 == null || span1.teacher == null || ger1.teacher == null) continue;
 
-            if (spanish == null || german == null) continue;
+            int remainingLanguages = Math.min(span1.totalHours, ger1.totalHours);
 
-            // Взимаме часовете (предполагаме, че са еднакви за двата езика)
-            int hoursToSchedule = Math.min(curr1.getOrDefault(spanish, 0), curr1.getOrDefault(german, 0));
-
-            for (int h = 0; h < hoursToSchedule; h++) {
+            while (remainingLanguages > 0) {
                 boolean scheduled = false;
-                for (int day = 0; day < 5 && !scheduled; day++) {
-                    for (int period = 0; period < 7 && !scheduled; period++) { // Търсим до 7-ми час
-                        String timeKey = day + "-" + period;
+                List<Integer> bestDays = Arrays.asList(0, 1, 2, 3, 4);
+                bestDays.sort(Comparator.comparingInt(d -> countFilledSlots(classSchedules.get(class1)[d])));
 
-                        if (prefilledGrids.get(class1)[day][period] != null || prefilledGrids.get(class2)[day][period] != null) continue;
+                boolean tryBlock = remainingLanguages >= 2;
 
-                        Teacher t1 = resourceAllocationService.findAvailableTeacher(spanish, allTeachers, day, period, 1, globalBusyTeacherIds);
-                        if (t1 != null) {
-                            globalBusyTeacherIds.computeIfAbsent(timeKey, k -> new HashSet<>()).add(t1.getId());
-                            Teacher t2 = resourceAllocationService.findAvailableTeacher(german, allTeachers, day, period, 1, globalBusyTeacherIds);
+                for (int day : bestDays) {
+                    if (scheduled) break;
 
-                            if (t2 != null) {
-                                Room r1 = resourceAllocationService.findAvailableRoom(spanish, allRooms, day, period, 1, globalBusyRoomIds);
-                                if (r1 != null) {
-                                    globalBusyRoomIds.computeIfAbsent(timeKey, k -> new HashSet<>()).add(r1.getRoomId());
-                                    Room r2 = resourceAllocationService.findAvailableRoom(german, allRooms, day, period, 1, globalBusyRoomIds);
+                    // Опит за БЛОК за езици
+                    if (tryBlock) {
+                        for (int period = 0; period < 6 && !scheduled; period++) {
+                            if (classSchedules.get(class1)[day][period] == null && classSchedules.get(class2)[day][period] == null &&
+                                    classSchedules.get(class1)[day][period+1] == null && classSchedules.get(class2)[day][period+1] == null &&
+                                    !teacherBusy.get(span1.teacher.getId())[day][period] && !teacherBusy.get(ger1.teacher.getId())[day][period] &&
+                                    !teacherBusy.get(span1.teacher.getId())[day][period+1] && !teacherBusy.get(ger1.teacher.getId())[day][period+1]) {
 
-                                    if (r2 != null) {
-                                        // УСПЕХ! Имаме 2 свободни учители и 2 свободни стаи!
-                                        globalBusyTeacherIds.get(timeKey).add(t2.getId());
-                                        globalBusyRoomIds.get(timeKey).add(r2.getRoomId());
-
-                                        ScheduleSlot splitSlot = new ScheduleSlot(spanish, t1, r1, german, t2, r2);
-                                        prefilledGrids.get(class1)[day][period] = splitSlot;
-                                        prefilledGrids.get(class2)[day][period] = splitSlot;
-                                        scheduled = true;
-                                        System.out.println("🔗 Езици ЗАКАЧЕНИ за " + class1 + " и " + class2 + " (Ден: " + day + ", Час: " + period + ")");
-                                        continue;
-                                    } else {
-                                        globalBusyRoomIds.get(timeKey).remove(r1.getRoomId()); // Rollback стая 1
+                                Room spanRoom = getAvailableRoomForBlock(allRooms, roomBusy, day, period, period+1);
+                                Room gerRoom = null;
+                                for(Room r : allRooms) {
+                                    if (spanRoom != null && r.getRoomId() == spanRoom.getRoomId()) continue;
+                                    if (!roomBusy.get(r.getRoomId())[day][period] && !roomBusy.get(r.getRoomId())[day][period+1]) {
+                                        gerRoom = r; break;
                                     }
                                 }
+
+                                if (spanRoom != null && gerRoom != null) {
+                                    ScheduleSlot s1 = new ScheduleSlot(span1.subject, span1.teacher, spanRoom, ger1.subject, ger1.teacher, gerRoom);
+                                    classSchedules.get(class1)[day][period] = s1;
+                                    classSchedules.get(class2)[day][period] = s1;
+                                    classSchedules.get(class1)[day][period+1] = s1;
+                                    classSchedules.get(class2)[day][period+1] = s1;
+
+                                    teacherBusy.get(span1.teacher.getId())[day][period] = true; teacherBusy.get(ger1.teacher.getId())[day][period] = true;
+                                    teacherBusy.get(span1.teacher.getId())[day][period+1] = true; teacherBusy.get(ger1.teacher.getId())[day][period+1] = true;
+                                    roomBusy.get(spanRoom.getRoomId())[day][period] = true; roomBusy.get(gerRoom.getRoomId())[day][period] = true;
+                                    roomBusy.get(spanRoom.getRoomId())[day][period+1] = true; roomBusy.get(gerRoom.getRoomId())[day][period+1] = true;
+
+                                    span1.remainingHours -= 2; ger1.remainingHours -= 2;
+                                    if (span2 != null) span2.remainingHours -= 2;
+                                    if (ger2 != null) ger2.remainingHours -= 2;
+
+                                    remainingLanguages -= 2;
+                                    scheduled = true;
+                                }
                             }
-                            globalBusyTeacherIds.get(timeKey).remove(t1.getId()); // Rollback учител 1
+                        }
+                    }
+
+                    // Единичен час за езици
+                    if (!scheduled) {
+                        for (int period = 0; period < 7 && !scheduled; period++) {
+                            if (classSchedules.get(class1)[day][period] != null || classSchedules.get(class2)[day][period] != null) continue;
+                            if (teacherBusy.get(span1.teacher.getId())[day][period] || teacherBusy.get(ger1.teacher.getId())[day][period]) continue;
+
+                            Room r1 = null, r2 = null;
+                            for (Room r : allRooms) {
+                                if (!roomBusy.get(r.getRoomId())[day][period]) {
+                                    if (r1 == null) r1 = r;
+                                    else { r2 = r; break; }
+                                }
+                            }
+
+                            if (r1 != null && r2 != null) {
+                                ScheduleSlot splitSlot = new ScheduleSlot(span1.subject, span1.teacher, r1, ger1.subject, ger1.teacher, r2);
+                                classSchedules.get(class1)[day][period] = splitSlot;
+                                classSchedules.get(class2)[day][period] = splitSlot;
+
+                                teacherBusy.get(span1.teacher.getId())[day][period] = true; teacherBusy.get(ger1.teacher.getId())[day][period] = true;
+                                roomBusy.get(r1.getRoomId())[day][period] = true; roomBusy.get(r2.getRoomId())[day][period] = true;
+
+                                span1.remainingHours--; ger1.remainingHours--;
+                                if (span2 != null) span2.remainingHours--;
+                                if (ger2 != null) ger2.remainingHours--;
+
+                                remainingLanguages--;
+                                scheduled = true;
+                            }
                         }
                     }
                 }
             }
         }
+
+        allCourses.sort((c1, c2) -> Integer.compare(c2.totalHours, c1.totalHours));
+
+        // ФАЗА 2: ОСНОВНО РЕДЕНЕ С БЛОК-ЧАСОВЕ
+        for (Course course : allCourses) {
+            if (course.teacher == null || course.remainingHours <= 0) continue;
+
+            int maxHoursPerDay = Math.max(2, (int) Math.ceil(course.totalHours / 5.0));
+
+            while (course.remainingHours > 0) {
+                boolean placed = false;
+                List<Integer> bestDays = Arrays.asList(0, 1, 2, 3, 4);
+                bestDays.sort(Comparator.comparingInt(d -> countFilledSlots(classSchedules.get(course.classCode)[d])));
+
+                boolean tryBlock = course.remainingHours >= 2;
+
+                for (int day : bestDays) {
+                    if (placed) break;
+                    if (countSubjectToday(classSchedules.get(course.classCode)[day], course.subject) >= maxHoursPerDay) continue;
+
+                    // 1. ОПИТ ЗА БЛОК ОТ 2 ЧАСА
+                    if (tryBlock && countSubjectToday(classSchedules.get(course.classCode)[day], course.subject) + 2 <= Math.max(2, maxHoursPerDay)) {
+                        for (int period = 0; period < 6 && !placed; period++) {
+                            if (classSchedules.get(course.classCode)[day][period] == null &&
+                                    classSchedules.get(course.classCode)[day][period + 1] == null &&
+                                    !teacherBusy.get(course.teacher.getId())[day][period] &&
+                                    !teacherBusy.get(course.teacher.getId())[day][period + 1]) {
+
+                                // Търсим 1 стая, която е свободна и за двата часа
+                                Room sameRoom = getAvailableRoomForBlock(allRooms, roomBusy, day, period, period + 1);
+
+                                if (sameRoom != null) {
+                                    placeSlot(classSchedules, teacherBusy, roomBusy, course, sameRoom, day, period);
+                                    placeSlot(classSchedules, teacherBusy, roomBusy, course, sameRoom, day, period + 1);
+                                    placed = true;
+                                } else {
+                                    // Ако няма същата стая, взимаме две различни стаи
+                                    Room room1 = getAvailableRoom(allRooms, roomBusy, day, period);
+                                    Room room2 = getAvailableRoom(allRooms, roomBusy, day, period + 1);
+                                    if (room1 != null && room2 != null) {
+                                        placeSlot(classSchedules, teacherBusy, roomBusy, course, room1, day, period);
+                                        placeSlot(classSchedules, teacherBusy, roomBusy, course, room2, day, period + 1);
+                                        placed = true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 2. АКО НЕ УСПЕЕМ С БЛОК ИЛИ Е ОСТАНАЛ САМО 1 ЧАС -> ЕДИНИЧЕН
+                    if (!placed) {
+                        for (int period = 0; period < 7 && !placed; period++) {
+                            if (classSchedules.get(course.classCode)[day][period] != null) continue;
+                            if (teacherBusy.get(course.teacher.getId())[day][period]) continue;
+
+                            Room availableRoom = getAvailableRoom(allRooms, roomBusy, day, period);
+                            if (availableRoom != null) {
+                                placeSlot(classSchedules, teacherBusy, roomBusy, course, availableRoom, day, period);
+                                placed = true;
+                            }
+                        }
+                    }
+                }
+
+                if (!placed) {
+                    for (int day : bestDays) {
+                        if (placed) break;
+                        if (countSubjectToday(classSchedules.get(course.classCode)[day], course.subject) >= maxHoursPerDay) continue;
+
+                        int period = 7;
+                        if (classSchedules.get(course.classCode)[day][period] == null &&
+                                !teacherBusy.get(course.teacher.getId())[day][period]) {
+                            Room availableRoom = getAvailableRoom(allRooms, roomBusy, day, period);
+                            if (availableRoom != null) {
+                                placeSlot(classSchedules, teacherBusy, roomBusy, course, availableRoom, day, period);
+                                placed = true;
+                            }
+                        }
+                    }
+                }
+
+                if (!placed) {
+                    System.out.println("❌ НЕВЪЗМОЖНО ПОСТАВЯНЕ: Останаха " + course.remainingHours +
+                            " часа по " + course.subject.getSubjectName() + " за " + course.classCode);
+                    break;
+                }
+            }
+        }
+
+        compactSchedules(allClasses, classSchedules, teacherBusy, roomBusy);
+
+        String[] days = {"Monday", "Tuesday", "Wednesday", "Thursday", "Friday"};
+        Map<String, Map<String, Object>> finalResult = new HashMap<>();
+
+        for (String classCode : allClasses) {
+            Map<String, Object> weeklySchedule = new LinkedHashMap<>();
+            for (int d = 0; d < 5; d++) {
+                weeklySchedule.put(days[d], Arrays.asList(classSchedules.get(classCode)[d]).subList(0, 8));
+            }
+            scheduleDatabaseService.saveClassScheduleToDatabase(classCode, weeklySchedule);
+            finalResult.put(classCode, weeklySchedule);
+        }
+        System.out.println("✅ Генерирането приключи!");
+        return finalResult;
     }
 
-    // Помощен метод за намиране на "другарчето" (1 с 2, 3 с 5, 4 с 6)
-    private String getPairedClassCode(String classCode) {
-        if (classCode == null || classCode.length() < 3) return null;
-        String prefix = classCode.substring(0, classCode.length() - 1);
-        char lastDigit = classCode.charAt(classCode.length() - 1);
-
-        return switch (lastDigit) {
-            case '1' -> prefix + "2";
-            case '2' -> prefix + "1";
-            case '3' -> prefix + "5";
-            case '5' -> prefix + "3";
-            case '4' -> prefix + "6";
-            case '6' -> prefix + "4";
-            default -> null;
-        };
+    private int countFilledSlots(ScheduleSlot[] dailySchedule) {
+        int count = 0;
+        for (ScheduleSlot scheduleSlot : dailySchedule) {
+            if (scheduleSlot != null) count++;
+        }
+        return count;
     }
 
-    // Помощен метод за намиране на предмет по част от името
-    private Subject findSubjectByKeyword(Set<Subject> subjects, String keyword) {
-        for (Subject s : subjects) {
-            if (s.getSubjectName().toLowerCase().contains(keyword.toLowerCase())) {
-                return s;
+    private Room getAvailableRoomForBlock(List<Room> allRooms, Map<Integer, boolean[][]> roomBusy, int day, int period1, int period2) {
+        for (Room r : allRooms) {
+            if (!roomBusy.get(r.getRoomId())[day][period1] && !roomBusy.get(r.getRoomId())[day][period2]) {
+                return r;
             }
         }
         return null;
     }
-    // --- КРАЙ НА ЛОГИКАТА ЗА ФАЗА 0 ---
 
-    private void runPhase(ScheduleSlot[][] grid, int[] hoursPerDay, List<Map.Entry<Subject, Integer>> sortedSubjects,
-                          Map<Subject, Integer> originalCurriculum, List<Teacher> allTeachers, List<Room> allRooms,
-                          Map<String, Set<Integer>> busyTeacherIds, Map<String, Set<Integer>> busyRoomIds,
-                          Map<Subject, Teacher> classAssignedTeachers, int maxPeriodsForDay, int maxAllowedRelaxation, boolean allowGaps) {
-        boolean progressMade;
-        do {
-            progressMade = false;
-            for (Map.Entry<Subject, Integer> entry : sortedSubjects) {
-                int remainingHours = entry.getValue();
-                if (remainingHours <= 0) continue;
-
-                Subject subject = entry.getKey();
-                int totalWeeklyHours = originalCurriculum.getOrDefault(subject, remainingHours);
-                int maxAllowedPerDay = getMaxAllowedPerDay(totalWeeklyHours) + maxAllowedRelaxation;
-                int blockLength = (remainingHours >= 2) ? 2 : 1;
-
-                boolean placed;
-                if (!allowGaps) {
-                    placed = placeBlockWithoutGaps(grid, hoursPerDay, subject, blockLength, maxAllowedPerDay,
-                            allTeachers, allRooms, busyTeacherIds, busyRoomIds, classAssignedTeachers, maxPeriodsForDay);
-                    if (!placed && blockLength == 2) {
-                        blockLength = 1;
-                        placed = placeBlockWithoutGaps(grid, hoursPerDay, subject, blockLength, maxAllowedPerDay,
-                                allTeachers, allRooms, busyTeacherIds, busyRoomIds, classAssignedTeachers, maxPeriodsForDay);
-                    }
-                } else {
-                    placed = placeBlockWithGaps(grid, subject, blockLength, maxAllowedPerDay,
-                            allTeachers, allRooms, busyTeacherIds, busyRoomIds, classAssignedTeachers, maxPeriodsForDay);
-                    if (!placed && blockLength == 2) {
-                        blockLength = 1;
-                        placed = placeBlockWithGaps(grid, subject, blockLength, maxAllowedPerDay,
-                                allTeachers, allRooms, busyTeacherIds, busyRoomIds, classAssignedTeachers, maxPeriodsForDay);
-                    }
-                }
-
-                if (placed) {
-                    entry.setValue(remainingHours - blockLength);
-                    progressMade = true;
-                }
-            }
-        } while (progressMade);
+    private String getPairedClassCode(String classCode) {
+        if (classCode == null || classCode.length() < 3) return null;
+        String prefix = classCode.substring(0, classCode.length() - 1);
+        char lastDigit = classCode.charAt(classCode.length() - 1);
+        return switch (lastDigit) {
+            case '1' -> prefix + "2"; case '2' -> prefix + "1"; case '3' -> prefix + "5";
+            case '5' -> prefix + "3"; case '4' -> prefix + "6"; case '6' -> prefix + "4";
+            default -> null;
+        };
     }
 
-    @Override
-    public boolean placeBlockWithoutGaps(ScheduleSlot[][] grid, int[] hoursPerDay, Subject subject, int duration,
-                                         int maxAllowedPerDay, List<Teacher> allTeachers, List<Room> allRooms,
-                                         Map<String, Set<Integer>> busyTeacherIds, Map<String, Set<Integer>> busyRoomIds,
-                                         Map<Subject, Teacher> classAssignedTeachers, int maxPeriodsForDay) {
-        List<Integer> days = Arrays.asList(0, 1, 2, 3, 4);
-        Collections.shuffle(days);
-        days.sort(Comparator.comparingInt(d -> countOccupiedSlots(grid[d])));
+    private Course findCourseByKeyword(List<Course> allCourses, String classCode, String keyword) {
+        return allCourses.stream()
+                .filter(c -> c.classCode.equals(classCode) && c.subject.getSubjectName().toLowerCase().contains(keyword.toLowerCase()))
+                .findFirst().orElse(null);
+    }
 
-        Teacher requiredTeacher = classAssignedTeachers.get(subject);
-        List<Teacher> allowedTeachers = (requiredTeacher != null) ? Collections.singletonList(requiredTeacher) : allTeachers;
-
-        for (int day : days) {
-            if (countSubjectOnDay(grid[day], subject) + duration > maxAllowedPerDay) {
-                continue;
-            }
-
-            int startPeriod = findFirstFreePeriod(grid[day], maxPeriodsForDay);
-            if (startPeriod == -1 || startPeriod + duration > maxPeriodsForDay) {
-                continue;
-            }
-
-            boolean canFit = true;
-            for (int i = 0; i < duration; i++) {
-                if (grid[day][startPeriod + i] != null) {
-                    canFit = false;
-                    break;
-                }
-            }
-
-            if (!canFit) {
-                continue;
-            }
-
-            Teacher availableTeacher = resourceAllocationService.findAvailableTeacher(subject, allowedTeachers, day, startPeriod, duration, busyTeacherIds);
-            Room availableRoom = resourceAllocationService.findAvailableRoom(subject, allRooms, day, startPeriod, duration, busyRoomIds);
-
-            if (availableTeacher == null || availableRoom == null) {
-                continue;
-            }
-
-            if (requiredTeacher == null) {
-                classAssignedTeachers.put(subject, availableTeacher);
-            }
-
-            for (int i = 0; i < duration; i++) {
-                int currentPeriod = startPeriod + i;
-                grid[day][currentPeriod] = new ScheduleSlot(subject, availableTeacher, availableRoom);
-
-                String timeKey = day + "-" + currentPeriod;
-                busyTeacherIds.computeIfAbsent(timeKey, k -> new HashSet<>()).add(availableTeacher.getId());
-                busyRoomIds.computeIfAbsent(timeKey, k -> new HashSet<>()).add(availableRoom.getRoomId());
-            }
-
-            return true;
+    private Room getAvailableRoom(List<Room> allRooms, Map<Integer, boolean[][]> roomBusy, int day, int period) {
+        for (Room r : allRooms) {
+            if (!roomBusy.get(r.getRoomId())[day][period]) return r;
         }
-        return false;
+        return null;
     }
 
-    private boolean placeBlockWithGaps(ScheduleSlot[][] grid, Subject subject, int duration,
-                                       int maxAllowedPerDay, List<Teacher> allTeachers, List<Room> allRooms,
-                                       Map<String, Set<Integer>> busyTeacherIds, Map<String, Set<Integer>> busyRoomIds,
-                                       Map<Subject, Teacher> classAssignedTeachers, int maxPeriodsForDay) {
-        List<Integer> days = Arrays.asList(0, 1, 2, 3, 4);
-        days.sort(Comparator.comparingInt(d -> countOccupiedSlots(grid[d])));
-
-        Teacher requiredTeacher = classAssignedTeachers.get(subject);
-        List<Teacher> allowedTeachers = (requiredTeacher != null) ? Collections.singletonList(requiredTeacher) : allTeachers;
-
-        for (int day : days) {
-            if (countSubjectOnDay(grid[day], subject) + duration > maxAllowedPerDay) {
-                continue;
-            }
-
-            for (int startPeriod = 0; startPeriod <= maxPeriodsForDay - duration; startPeriod++) {
-
-                boolean slotsFree = true;
-                for (int i = 0; i < duration; i++) {
-                    if (grid[day][startPeriod + i] != null) {
-                        slotsFree = false;
-                        break;
-                    }
-                }
-                if (!slotsFree) continue;
-
-                Teacher availableTeacher = resourceAllocationService.findAvailableTeacher(subject, allowedTeachers, day, startPeriod, duration, busyTeacherIds);
-                Room availableRoom = resourceAllocationService.findAvailableRoom(subject, allRooms, day, startPeriod, duration, busyRoomIds);
-
-                if (availableTeacher != null && availableRoom != null) {
-
-                    if (requiredTeacher == null) {
-                        classAssignedTeachers.put(subject, availableTeacher);
-                    }
-
-                    for (int i = 0; i < duration; i++) {
-                        int currentPeriod = startPeriod + i;
-                        grid[day][currentPeriod] = new ScheduleSlot(subject, availableTeacher, availableRoom);
-
-                        String timeKey = day + "-" + currentPeriod;
-                        busyTeacherIds.computeIfAbsent(timeKey, k -> new HashSet<>()).add(availableTeacher.getId());
-                        busyRoomIds.computeIfAbsent(timeKey, k -> new HashSet<>()).add(availableRoom.getRoomId());
-                    }
-                    return true;
-                }
-            }
-        }
-        return false;
+    private void placeSlot(Map<String, ScheduleSlot[][]> classSchedules, Map<Integer, boolean[][]> teacherBusy,
+                           Map<Integer, boolean[][]> roomBusy, Course course, Room availableRoom, int day, int period) {
+        classSchedules.get(course.classCode)[day][period] = new ScheduleSlot(course.subject, course.teacher, availableRoom);
+        teacherBusy.get(course.teacher.getId())[day][period] = true;
+        roomBusy.get(availableRoom.getRoomId())[day][period] = true;
+        course.remainingHours--;
     }
 
-    @Override
-    public boolean hasSubjectOnDay(ScheduleSlot[] daySchedule, Subject subject) {
-        return countSubjectOnDay(daySchedule, subject) > 0;
-    }
-
-    private int countSubjectOnDay(ScheduleSlot[] daySchedule, Subject subject) {
+    private int countSubjectToday(ScheduleSlot[] dailySchedule, Subject subject) {
         int count = 0;
-        for (ScheduleSlot slot : daySchedule) {
+        for (ScheduleSlot slot : dailySchedule) {
             if (slot != null) {
-                if (slot.getSubject() != null && slot.getSubject().getSubjectId() == subject.getSubjectId()) {
-                    count++;
-                }
-                // Проверяваме и втория предмет, ако е слят слот
-                if (slot.getSubject2() != null && slot.getSubject2().getSubjectId() == subject.getSubjectId()) {
-                    count++;
-                }
+                if (slot.getSubject() != null && slot.getSubject().getSubjectId() == subject.getSubjectId()) count++;
+                if (slot.getSubject2() != null && slot.getSubject2().getSubjectId() == subject.getSubjectId()) count++;
             }
         }
         return count;
     }
 
-    private int countOccupiedSlots(ScheduleSlot[] daySchedule) {
-        int count = 0;
-        for (int i = 0; i <= 7; i++) {
-            if (daySchedule[i] != null) count++;
-        }
-        return count;
-    }
+    @Override
+    @Transactional
+    public void generateAndSaveAllClasses() { generateAllSchedulesCore(); }
 
-    private int getMaxAllowedPerDay(int totalWeeklyHours) {
-        if (totalWeeklyHours >= 15) return 4;
-        if (totalWeeklyHours >= 8) return 3;
-        return 2;
-    }
+    @Override
+    @Transactional
+    public Map<String, Object> generateScheduleForClass(String classCode) { return new HashMap<>(); }
 
-    private int findFirstFreePeriod(ScheduleSlot[] daySchedule, int maxPeriods) {
-        for (int i = 0; i < maxPeriods; i++) {
-            if (daySchedule[i] == null) {
-                return i;
+
+    @Override
+    public boolean hasSubjectOnDay(ScheduleSlot[] daySchedule, Subject subject) { return countSubjectToday(daySchedule, subject) > 0; }
+
+    private void compactSchedules(List<String> allClasses, Map<String, ScheduleSlot[][]> classSchedules,
+                                  Map<Integer, boolean[][]> teacherBusy, Map<Integer, boolean[][]> roomBusy) {
+        System.out.println("🧹 Започва премахване на дупките (сгъстяване на програмата)...");
+        boolean changed;
+        do {
+            changed = false;
+            for (String classCode : allClasses) {
+                for (int day = 0; day < 5; day++) {
+                    // Търсим дупка (свободен час от 0 до 6)
+                    for (int period = 0; period < 7; period++) {
+                        if (classSchedules.get(classCode)[day][period] == null) {
+
+                            // Намерили сме дупка. Търсим следващ час в същия ден, който да дръпнем напред
+                            for (int next = period + 1; next < 8; next++) {
+                                ScheduleSlot slotToMove = classSchedules.get(classCode)[day][next];
+                                if (slotToMove != null) {
+                                    // Можем ли да го преместим тук? (Свободни ли са учителите и стаите)
+                                    boolean canMove = true;
+
+                                    // Проверка за основния учител и стая
+                                    if (teacherBusy.get(slotToMove.getTeacher().getId())[day][period]) canMove = false;
+                                    if (canMove && roomBusy.get(slotToMove.getRoom().getRoomId())[day][period]) canMove = false;
+
+                                    // Проверка за втори учител/стая (при слети класове като езиците)
+                                    if (canMove && slotToMove.getTeacher2() != null) {
+                                        if (teacherBusy.get(slotToMove.getTeacher2().getId())[day][period]) canMove = false;
+                                        if (roomBusy.get(slotToMove.getRoom2().getRoomId())[day][period]) canMove = false;
+                                    }
+
+                                    if (canMove) {
+                                        // МЕСТИМ ГО!
+                                        classSchedules.get(classCode)[day][period] = slotToMove;
+                                        classSchedules.get(classCode)[day][next] = null;
+
+                                        // Обновяваме масивите за заетост (освобождаваме стария час, заемаме новия)
+                                        teacherBusy.get(slotToMove.getTeacher().getId())[day][next] = false;
+                                        teacherBusy.get(slotToMove.getTeacher().getId())[day][period] = true;
+                                        roomBusy.get(slotToMove.getRoom().getRoomId())[day][next] = false;
+                                        roomBusy.get(slotToMove.getRoom().getRoomId())[day][period] = true;
+
+                                        if (slotToMove.getTeacher2() != null) {
+                                            teacherBusy.get(slotToMove.getTeacher2().getId())[day][next] = false;
+                                            teacherBusy.get(slotToMove.getTeacher2().getId())[day][period] = true;
+                                            roomBusy.get(slotToMove.getRoom2().getRoomId())[day][next] = false;
+                                            roomBusy.get(slotToMove.getRoom2().getRoomId())[day][period] = true;
+                                        }
+                                        changed = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
-        }
-        return -1;
-    }
-
-    private int extractGradeNumber(String classCode) {
-        String numberOnly = classCode.replaceAll("[^0-9]", "");
-        if (numberOnly.isEmpty()) {
-            return 0;
-        }
-        return Integer.parseInt(numberOnly);
+        } while (changed);
     }
 }
