@@ -60,9 +60,6 @@ document.addEventListener('DOMContentLoaded', () => {
         saveBtn.addEventListener('click', () => exportAllClassesToPDF(saveBtn));
     }
 });
-
-// Функциите за рендиране остават същите (renderClasses, renderScheduleTable и т.н.)
-// Можеш да копираш останалата част от стария си код тук...
 function renderClasses() {
     const select = document.getElementById('class-select-admin');
     if (!select) return;
@@ -122,7 +119,7 @@ function renderScheduleTable() {
         tdHour.className = 'hour-col';
         tdHour.innerHTML = `
             <div style="font-weight: bold; margin-bottom: 4px; color: #4F46E5;">${i} час</div>
-            <div style="font-size: 0.75rem; color: #6B7280; white-space: nowrap;">${classTimes[i-1]}</div>
+            <div style="font-size: 0.75rem; color: #6B7280; white-space: nowrap;">${classTimes ? classTimes[i-1] : ''}</div>
         `;
         tr.appendChild(tdHour);
         
@@ -130,6 +127,10 @@ function renderScheduleTable() {
             const td = document.createElement('td');
             td.className = 'drop-zone';
             td.dataset.slot = `${day}-${i}`;
+            
+            // НОВО: Добавяме data атрибути за ден и час, за да ги четем при преместване
+            td.dataset.day = day;
+            td.dataset.period = i - 1; // За да отговаря на масивите (0-7)
             
             td.innerHTML = `
                 <div class="cell-content">
@@ -146,11 +147,13 @@ function renderScheduleTable() {
 
             // Напълване на стаите
             const roomSelect = td.querySelector('.room-select');
-            db.rooms.forEach(room => {
-                const opt = document.createElement('option');
-                opt.value = room; opt.textContent = room;
-                roomSelect.appendChild(opt);
-            });
+            if (db && db.rooms) {
+                db.rooms.forEach(room => {
+                    const opt = document.createElement('option');
+                    opt.value = room; opt.textContent = room;
+                    roomSelect.appendChild(opt);
+                });
+            }
 
             // Клик събитие
             td.addEventListener('click', (e) => {
@@ -160,19 +163,107 @@ function renderScheduleTable() {
                 activeCell = td;
             });
 
-            // Drag & Drop събития
-            td.addEventListener('dragover', (e) => { e.preventDefault(); td.classList.add('drag-over'); });
+            // ==========================================
+            // НОВО: ОБЕДИНЕН DRAG & DROP
+            // ==========================================
+            td.addEventListener('dragover', (e) => { 
+                e.preventDefault(); 
+                td.classList.add('drag-over'); 
+            });
+            
             td.addEventListener('dragleave', () => td.classList.remove('drag-over'));
-            td.addEventListener('drop', (e) => {
+            
+            td.addEventListener('drop', async (e) => {
                 e.preventDefault();
                 td.classList.remove('drag-over');
-                const subjectData = JSON.parse(e.dataTransfer.getData("application/json"));
-                applySubjectToCell(td, subjectData);
+
+                // Проверяваме дали пускаме от страничния панел
+                const sidebarData = e.dataTransfer.getData("application/json");
+                
+                if (sidebarData) {
+                    // 1. Влачене от списъка вляво (Нов предмет)
+                    const subjectData = JSON.parse(sidebarData);
+                    applySubjectToCell(td, subjectData);
+                } else {
+                    // 2. Влачене от друга клетка (Преместване на съществуващ час)
+                    const draggedId = e.dataTransfer.getData("text/plain");
+                    const draggedContent = document.getElementById(draggedId);
+                    
+                    if (!draggedContent) return;
+
+                    const sourceCell = draggedContent.parentElement;
+                    if (sourceCell === td) return; // Ако го пуснем в същата клетка - нищо не правим
+
+                    const classCode = document.getElementById('class-select-admin').value;
+                    const newDay = td.dataset.day;
+                    const newPeriod = parseInt(td.dataset.period);
+                    
+                    // Взимаме текущите учител и стая от падащите менюта на влачения елемент
+                    const teacherName = draggedContent.querySelector('.teacher-select').value;
+                    const roomName = draggedContent.querySelector('.room-select').value;
+
+                    // Проверка за конфликти (използва функцията от dragAndDrop.js)
+                    if (typeof checkAvailability === 'function') {
+                        const conflictMsg = await checkAvailability(newDay, newPeriod, teacherName, roomName, classCode);
+                        if (conflictMsg) {
+                            alert(`❌ Не може да преместите часа!\n\n${conflictMsg}`);
+                            return;
+                        }
+                    }
+
+                    // АКО НЯМА КОНФЛИКТ: Разменяме съдържанието на двете клетки (Swap)
+                    const targetContent = td.querySelector('.cell-content');
+                    sourceCell.appendChild(targetContent); // Празното (или старото) отива в старата клетка
+                    td.appendChild(draggedContent);        // Влаченото отива в новата клетка
+                }
             });
 
             tr.appendChild(td);
         });
         tbody.appendChild(tr);
+    }
+}
+
+// ==========================================
+// 4. ЛОГИКА НА ТАБЛИЦАТА
+// ==========================================
+
+function applySubjectToCell(cell, subject) {
+    const contentBox = cell.querySelector('.cell-content');
+    const title = cell.querySelector('.cell-subject-title');
+    const teacherSelect = cell.querySelector('.teacher-select');
+    
+    // НОВО: Правим го Draggable и му даваме уникално ID, за да може да се мести!
+    contentBox.draggable = true;
+    if (!contentBox.id) {
+        contentBox.id = `block-${Math.random().toString(36).substr(2, 9)}`; 
+    }
+
+    // НОВО: Ефекти при започване на влачене
+    contentBox.ondragstart = (e) => {
+        e.dataTransfer.setData("text/plain", contentBox.id);
+        setTimeout(() => contentBox.style.opacity = "0.5", 0);
+    };
+    contentBox.ondragend = () => {
+        contentBox.style.opacity = "1";
+    };
+
+    contentBox.classList.add('filled');
+    contentBox.style.backgroundColor = subject.color || generateDistinctColor(subject.name);
+    cell.querySelector('.empty-hint').style.display = 'none';
+    title.style.display = 'block';
+    title.textContent = subject.name;
+
+    teacherSelect.innerHTML = '<option value="">Учител</option>';
+    
+    if (db && db.teachers) {
+        const eligibleTeachers = db.teachers.filter(t => t.subjects && t.subjects.includes(subject.name));
+        eligibleTeachers.forEach(t => {
+            const opt = document.createElement('option');
+            opt.value = t.name; 
+            opt.textContent = t.name;
+            teacherSelect.appendChild(opt);
+        });
     }
 }
 
