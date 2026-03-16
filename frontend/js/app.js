@@ -6,7 +6,6 @@ document.addEventListener('DOMContentLoaded', () => {
     initAddClass();
     initAddSubject();
 
-    // Слушател за смяна на класа
     const classSelect = document.getElementById('class-select-admin');
     if (classSelect) {
         classSelect.addEventListener('change', async (e) => {

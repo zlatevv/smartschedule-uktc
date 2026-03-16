@@ -31,13 +31,10 @@
                 <h2>За ученици</h2>
                 <p class="subtitle">Избери своя клас, за да видиш програмата си.</p>
                 
-                <form action="table-schedule.html" method="GET">
+                <form action="html/table-schedule.html" method="GET">
                     <div class="form-group">
-                        <select name="class" required>
+                        <select name="class" id="class-select-index" required>
                             <option value="" disabled selected>-- Избери клас --</option>
-                            <option value="8a">8А Клас</option>
-                            <option value="9a">9А Клас</option>
-                            <option value="10a">10А Клас</option>
                         </select>
                     </div>
                     <button type="submit" class="btn-primary">Покажи програма</button>
@@ -66,5 +63,6 @@
         </div> 
     </main>
     <script type="module" src="/frontend/js/auth.js"></script>
+    <script type="module" src="/frontend/js/index.js"></script>
 </body>
 </html>
