@@ -35,6 +35,7 @@ class ClassCurriculum(Base):
     class_id = Column(Integer, ForeignKey("classes.id")) # Link to the new Class table
     subject_id = Column(Integer, ForeignKey("subjects.id"))
     hours_per_week = Column(Integer)
+    group_id = Column(Integer, nullable=True)
 
 class TimetableRecord(Base):
     __tablename__ = "timetable_records"
@@ -45,3 +46,4 @@ class TimetableRecord(Base):
     room_id = Column(Integer, ForeignKey("rooms.id"))
     subject_id = Column(Integer, ForeignKey("subjects.id"))
     teacher_id = Column(Integer, ForeignKey("teachers.id"))
+    group_id = Column(Integer, nullable=True)

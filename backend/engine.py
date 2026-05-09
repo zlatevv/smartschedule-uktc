@@ -5,33 +5,7 @@ SmartSchedule – Production Timetable Solver
 Architecture: Two-phase hybrid solver (industry standard for school timetabling)
 
 Phase 1 – Simulated Annealing (SA)
-  Rapidly explores the solution space to find a good feasible starting point.
-  SA is the algorithm used by most commercial timetabling tools (Untis, FET, ASC)
-  as the primary search engine because it handles hard constraints naturally and
-  escapes local minima via controlled randomness.
-
 Phase 2 – CP-SAT polishing (optional, time-permitting)
-  The SA solution is fed into Google OR-Tools CP-SAT as a warm-start hint.
-  CP-SAT then tightens constraint violations and improves soft objectives without
-  having to search from scratch.
-
-Variable design
-  One slot per (class, curriculum_entry, occurrence) assigned to (day, period).
-  Teacher + room are derived attributes, NOT solver dimensions → ~100× fewer
-  variables than the naive (class × teacher × subject × room × day × period) grid.
-
-Constraints (hard)
-  H1  Every curriculum entry is scheduled exactly hours_per_week times.
-  H2  A class has at most one lesson per slot.
-  H3  A teacher teaches at most one class per slot.
-  H4  A room hosts at most one class per slot.
-  H5  "Час на класа" is pinned to Monday period 7 (day=0, period=6).
-
-Soft objectives (SA cost function)
-  S1  Minimise teacher idle gaps within a day.
-  S2  Minimise class idle gaps within a day.
-  S3  Spread occurrences of the same subject across different days.
-  S4  Avoid scheduling in the last period (period 7) except homeroom.
 """
 
 import random
@@ -60,15 +34,18 @@ SA_ITERATIONS_PER_TEMP = 5   # inner loop iterations before cooling
 
 class SlotAssignment:
     """One scheduled lesson: which (day, period) a curriculum occurrence sits in."""
-    __slots__ = ("class_id", "subject_id", "teacher_id", "day", "period", "key")
+    # FIXED: Added group_id to __slots__
+    __slots__ = ("class_id", "subject_id", "teacher_id", "day", "period", "group_id", "key")
 
-    def __init__(self, class_id, subject_id, teacher_id, day, period):
+    # FIXED: Added group_id to the initialization parameters
+    def __init__(self, class_id, subject_id, teacher_id, day, period, group_id=0):
         self.class_id   = class_id
         self.subject_id = subject_id
         self.teacher_id = teacher_id
         self.day        = day
         self.period     = period
-        self.key        = (class_id, subject_id, teacher_id)
+        self.group_id   = group_id
+        self.key        = (class_id, subject_id, teacher_id, group_id)
 
 
 # ─── helper: room assignment (greedy post-solve) ──────────────────────────────
@@ -122,13 +99,17 @@ def _compute_cost(
     teacher_slots: dict[tuple, list] = defaultdict(list)  # (teacher_id, d, p) -> [a]
 
     for a in assignments:
+        # NOTE: Only count as a double booking if it's the SAME class, but ignore split groups (Уп 1 vs Уп 2)
         class_slots[(a.class_id, a.day, a.period)].append(a)
         teacher_slots[(a.teacher_id, a.day, a.period)].append(a)
 
-    # H2 – class double booking
+    # H2 – class double booking (Ignoring parallel languages & split groups naturally handled by group_id in Phase 2)
     for v in class_slots.values():
         if len(v) > 1:
-            cost += 1000 * (len(v) - 1)
+            # Quick check: if they are parallel languages or split groups, it's fine!
+            groups = [x.group_id for x in v]
+            if not (all(g in (11, 12, 13) for g in groups) or all(g in (1, 2) for g in groups)):
+                cost += 1000 * (len(v) - 1)
 
     # H3 – teacher double booking
     for v in teacher_slots.values():
@@ -151,7 +132,7 @@ def _compute_cost(
         teacher_day_periods[(a.teacher_id, a.day)].append(a.period)
     for periods in teacher_day_periods.values():
         if len(periods) > 1:
-            periods_sorted = sorted(periods)
+            periods_sorted = sorted(set(periods)) # use set to ignore simultaneous group lessons
             gaps = periods_sorted[-1] - periods_sorted[0] - (len(periods_sorted) - 1)
             cost += gaps * 2
 
@@ -161,7 +142,7 @@ def _compute_cost(
         class_day_periods[(a.class_id, a.day)].append(a.period)
     for periods in class_day_periods.values():
         if len(periods) > 1:
-            periods_sorted = sorted(periods)
+            periods_sorted = sorted(set(periods))
             gaps = periods_sorted[-1] - periods_sorted[0] - (len(periods_sorted) - 1)
             cost += gaps * 3
 
@@ -183,102 +164,108 @@ def _compute_cost(
 
 # ─── initial solution builder ─────────────────────────────────────────────────
 
-def _build_initial_solution(
-    curriculum: list,
-    qualified_teachers: dict,
-    homeroom_subject_id: int | None,
-    class_head: dict,
-) -> list[SlotAssignment]:
-    """
-    Constructs a random-but-valid-ish initial solution.
-    Homeroom is pinned immediately; everything else is randomly placed.
-    """
+def _build_initial_solution(curriculum, qualified_teachers, homeroom_subject_id, class_head):
     assignments = []
 
+    # Separate normal curriculum from synchronized languages
+    lang_curr = defaultdict(list)
+    normal_curr = []
     for curr in curriculum:
-        c_id  = curr.class_id
-        s_id  = curr.subject_id
-        hours = curr.hours_per_week
+        if curr.group_id in (11, 12, 13):
+            lang_curr[curr.class_id].append(curr)
+        else:
+            normal_curr.append(curr)
 
+    # 1. Schedule normal and "Уп" lessons
+    for curr in normal_curr:
+        c_id, s_id, hours, g_id = curr.class_id, curr.subject_id, curr.hours_per_week, curr.group_id
         teachers = list(qualified_teachers.get(s_id, []))
+
         if homeroom_subject_id and s_id == homeroom_subject_id:
             head = class_head.get(c_id)
             teachers = [head] if head else []
 
-        if not teachers:
-            continue
+        if not teachers: continue
 
         for _ in range(hours):
             t_id = random.choice(teachers)
-
             if homeroom_subject_id and s_id == homeroom_subject_id:
                 d, p = HOMEROOM_DAY, HOMEROOM_PERIOD
             else:
-                d = random.randint(0, NUM_DAYS - 1)
-                p = random.randint(0, NUM_PERIODS - 2)  # avoid last period initially
+                d, p = random.randint(0, NUM_DAYS - 1), random.randint(0, NUM_PERIODS - 2)
+            assignments.append(SlotAssignment(c_id, s_id, t_id, d, p, g_id))
 
-            assignments.append(SlotAssignment(c_id, s_id, t_id, d, p))
+    # 2. Schedule Languages perfectly synced
+    for c_id, currs in lang_curr.items():
+        hours_map = {c: c.hours_per_week for c in currs}
+        if not hours_map: continue
+
+        max_hours = max(hours_map.values())
+        for _ in range(max_hours):
+            d, p = random.randint(0, NUM_DAYS - 1), random.randint(0, NUM_PERIODS - 2)
+
+            for c in currs:
+                if hours_map[c] > 0:
+                    teachers = list(qualified_teachers.get(c.subject_id, []))
+                    if teachers:
+                        t_id = random.choice(teachers)
+                        assignments.append(SlotAssignment(c_id, c.subject_id, t_id, d, p, c.group_id))
+                        hours_map[c] -= 1
 
     return assignments
 
 
-# ─── SA neighbour generator ───────────────────────────────────────────────────
-
-def _random_move(
-    assignments: list[SlotAssignment],
-    qualified_teachers: dict,
-    homeroom_subject_id: int | None,
-    class_head: dict,
-) -> list[SlotAssignment]:
-    """
-    Returns a new solution with one of three mutations:
-      • Move:   change (day, period) of a random non-homeroom lesson
-      • Swap:   swap (day, period) of two random non-homeroom lessons
-      • Teacher swap: assign a different qualified teacher to a lesson
-    """
+def _random_move(assignments, qualified_teachers, homeroom_subject_id, class_head):
     import copy
-    new_assignments = copy.copy(assignments)   # shallow – SlotAssignment objects are replaced not mutated
+    new_assignments = copy.copy(assignments)
+    moveable = [i for i, a in enumerate(new_assignments) if
+                not (homeroom_subject_id and a.subject_id == homeroom_subject_id)]
 
-    # Pick only moveable lessons (not pinned homeroom)
-    moveable = [
-        i for i, a in enumerate(new_assignments)
-        if not (homeroom_subject_id and a.subject_id == homeroom_subject_id)
-    ]
-    if not moveable:
-        return new_assignments
+    if not moveable: return new_assignments
 
     move_type = random.random()
-
     if move_type < 0.50:
-        # Move a single lesson to a random slot
         idx = random.choice(moveable)
-        a   = new_assignments[idx]
-        new_d = random.randint(0, NUM_DAYS - 1)
-        new_p = random.randint(0, NUM_PERIODS - 1)
-        new_assignments[idx] = SlotAssignment(a.class_id, a.subject_id, a.teacher_id, new_d, new_p)
+        a = new_assignments[idx]
+
+        # If it's a language, grab ALL parallel languages for this class in this slot
+        linked = [i for i, x in enumerate(new_assignments)
+                  if x.class_id == a.class_id and x.group_id in (
+                  11, 12, 13) and x.day == a.day and x.period == a.period] if a.group_id in (11, 12, 13) else [idx]
+
+        new_d, new_p = random.randint(0, NUM_DAYS - 1), random.randint(0, NUM_PERIODS - 1)
+        for i in linked:
+            old = new_assignments[i]
+            new_assignments[i] = SlotAssignment(old.class_id, old.subject_id, old.teacher_id, new_d, new_p, old.group_id)
 
     elif move_type < 0.80:
-        # Swap slots of two lessons
-        if len(moveable) < 2:
-            return new_assignments
-        idx1, idx2 = random.sample(moveable, 2)
-        a1, a2 = new_assignments[idx1], new_assignments[idx2]
-        new_assignments[idx1] = SlotAssignment(a1.class_id, a1.subject_id, a1.teacher_id, a2.day, a2.period)
-        new_assignments[idx2] = SlotAssignment(a2.class_id, a2.subject_id, a2.teacher_id, a1.day, a1.period)
+        if len(moveable) >= 2:
+            idx1, idx2 = random.sample(moveable, 2)
+            a1, a2 = new_assignments[idx1], new_assignments[idx2]
+
+            linked1 = [i for i, x in enumerate(new_assignments) if x.class_id == a1.class_id and x.group_id in (
+            11, 12, 13) and x.day == a1.day and x.period == a1.period] if a1.group_id in (11, 12, 13) else [idx1]
+            linked2 = [i for i, x in enumerate(new_assignments) if x.class_id == a2.class_id and x.group_id in (
+            11, 12, 13) and x.day == a2.day and x.period == a2.period] if a2.group_id in (11, 12, 13) else [idx2]
+
+            d1, p1 = a1.day, a1.period
+            d2, p2 = a2.day, a2.period
+
+            for i in linked1:
+                x = new_assignments[i]
+                new_assignments[i] = SlotAssignment(x.class_id, x.subject_id, x.teacher_id, d2, p2, x.group_id)
+            for i in linked2:
+                x = new_assignments[i]
+                new_assignments[i] = SlotAssignment(x.class_id, x.subject_id, x.teacher_id, d1, p1, x.group_id)
 
     else:
-        # Assign a different qualified teacher
-        idx  = random.choice(moveable)
-        a    = new_assignments[idx]
-        teachers = list(qualified_teachers.get(a.subject_id, []))
-        if len(teachers) > 1:
-            teachers = [t for t in teachers if t != a.teacher_id]
+        idx = random.choice(moveable)
+        a = new_assignments[idx]
+        teachers = [t for t in qualified_teachers.get(a.subject_id, []) if t != a.teacher_id]
         if teachers:
-            new_t = random.choice(teachers)
-            new_assignments[idx] = SlotAssignment(a.class_id, a.subject_id, new_t, a.day, a.period)
+            new_assignments[idx] = SlotAssignment(a.class_id, a.subject_id, random.choice(teachers), a.day, a.period, a.group_id)
 
     return new_assignments
-
 
 # ─── simulated annealing ──────────────────────────────────────────────────────
 
@@ -352,8 +339,7 @@ def _cpsat_polish(
     solver.parameters.num_search_workers    = 8
     solver.parameters.log_search_progress   = False
 
-    # Variables: for each lesson occurrence assign (day, period, teacher)
-    # We keep the same indexing as sa_solution for easy hint injection.
+    # Variables
     day_vars    = []
     period_vars = []
     teacher_vars = []
@@ -378,15 +364,30 @@ def _cpsat_polish(
         model.AddHint(pv, a.period)
         model.AddHint(tv, a.teacher_id)
 
-    n = len(sa_solution)
-
     # H5 – pin homeroom
     for i, a in enumerate(sa_solution):
         if homeroom_subject_id and a.subject_id == homeroom_subject_id:
             model.Add(day_vars[i]    == HOMEROOM_DAY)
             model.Add(period_vars[i] == HOMEROOM_PERIOD)
 
-    # H2 – class: no two lessons in same slot
+    # Synchronize Languages Super Glue
+    lang_by_class = defaultdict(lambda: {11: [], 12: [], 13: []})
+    for i, a in enumerate(sa_solution):
+        if a.group_id in (11, 12, 13):
+            lang_by_class[a.class_id][a.group_id].append(i)
+
+    for c_id, langs in lang_by_class.items():
+        active_lists = [langs[g] for g in (11, 12, 13) if langs[g]]
+        if len(active_lists) > 1:
+            for zip_idx in range(len(active_lists[0])):
+                base_var_idx = active_lists[0][zip_idx]
+                for other_list in active_lists[1:]:
+                    if zip_idx < len(other_list):
+                        other_var_idx = other_list[zip_idx]
+                        model.Add(day_vars[base_var_idx] == day_vars[other_var_idx])
+                        model.Add(period_vars[base_var_idx] == period_vars[other_var_idx])
+
+    # H2 – class: no two lessons in same slot (ignoring allowed splits)
     from itertools import combinations
     by_class: dict[int, list] = defaultdict(list)
     for i, a in enumerate(sa_solution):
@@ -394,7 +395,14 @@ def _cpsat_polish(
 
     for c_id, idxs in by_class.items():
         for i, j in combinations(idxs, 2):
-            # (day_i != day_j) OR (period_i != period_j)
+            gi = sa_solution[i].group_id
+            gj = sa_solution[j].group_id
+
+            # If they are parallel languages, they MUST be at the same time (handled above).
+            # If they are Уп splits (1 and 2), they are ALLOWED at the same time. We skip adding a conflict rule.
+            if (gi in (11,12,13) and gj in (11,12,13)) or (gi in (1,2) and gj in (1,2)):
+                continue
+
             same_day    = model.NewBoolVar(f"sd_{i}_{j}")
             same_period = model.NewBoolVar(f"sp_{i}_{j}")
             model.Add(day_vars[i]    == day_vars[j]).OnlyEnforceIf(same_day)
@@ -402,12 +410,6 @@ def _cpsat_polish(
             model.Add(period_vars[i] == period_vars[j]).OnlyEnforceIf(same_period)
             model.Add(period_vars[i] != period_vars[j]).OnlyEnforceIf(same_period.Not())
             model.AddBoolOr([same_day.Not(), same_period.Not()])
-
-    # H3 – teacher: no two lessons in same slot (only if same teacher assigned)
-    # This is tricky with IntVar teachers; we skip full enforcement here and
-    # rely on SA having already resolved most violations.  Full enforcement
-    # would require a large number of indicator constraints that could make
-    # CP-SAT slower than just keeping the SA solution.
 
     # S3 – spread: minimise same-subject same-day for same class
     spread_violations = []
@@ -430,12 +432,14 @@ def _cpsat_polish(
     if status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
         polished = []
         for i, a in enumerate(sa_solution):
+            # FIXED: Added a.group_id back to the polished SlotAssignment
             polished.append(SlotAssignment(
                 a.class_id,
                 a.subject_id,
                 solver.Value(teacher_vars[i]),
                 solver.Value(day_vars[i]),
                 solver.Value(period_vars[i]),
+                a.group_id
             ))
         print(f"  CP-SAT polish done – objective: {solver.ObjectiveValue():.0f}")
         return polished
@@ -507,13 +511,15 @@ def run_solver(sa_seconds: float = SA_MAX_SECONDS, cpsat_seconds: float = 25.0):
         records = []
         for idx, a in enumerate(final_solution):
             room_id = room_map.get(idx)
+            # FIXED: Added group_id so the front end can identify split groups!
             records.append(models.TimetableRecord(
-                class_id   = a.class_id,
-                teacher_id = a.teacher_id,
-                subject_id = a.subject_id,
-                room_id    = room_id,
+                class_id    = a.class_id,
+                teacher_id  = a.teacher_id,
+                subject_id  = a.subject_id,
+                room_id     = room_id,
                 day_of_week = a.day,
                 period      = a.period,
+                group_id    = a.group_id
             ))
 
         db.bulk_save_objects(records)
@@ -526,7 +532,6 @@ def run_solver(sa_seconds: float = SA_MAX_SECONDS, cpsat_seconds: float = 25.0):
         raise e
     finally:
         db.close()
-
 
 if __name__ == "__main__":
     run_solver()

@@ -13,7 +13,9 @@ document.addEventListener('DOMContentLoaded', () => {
             updateTeacherDisplay(selectedClass);
             if (selectedClass) {
                 try {
-                    const response = await fetch(`http://localhost:8080/api/schedule/class/${selectedClass}`);
+                    const response = await fetch(`http://127.0.0.1:8080/api/schedule/class/${selectedClass}`);
+                    console.log(response);
+                    
                     if (response.ok) {
                         const classData = await response.json();
                         visualizeGeneratedSchedule(classData);
@@ -41,9 +43,9 @@ document.addEventListener('DOMContentLoaded', () => {
             btnGenerate.disabled = true;
 
             try {
-                const genResponse = await fetch(`http://localhost:8080/api/schedule/generate/all`, { method: 'POST' });
+                const genResponse = await fetch(`http://127.0.0.1:8080/api/schedule/generate/all`, { method: 'POST' });
                 if (genResponse.ok) {
-                    const dataResponse = await fetch(`http://localhost:8080/api/schedule/class/${selectedClass}`);
+                    const dataResponse = await fetch(`http://127.0.0.1:8080/api/schedule/class/${selectedClass}`);
                     if (dataResponse.ok) {
                         visualizeGeneratedSchedule(await dataResponse.json()); 
                     }
@@ -343,7 +345,7 @@ function initAddClass() {
         
         if (classCodeVal && teacherIdVal) {
             try {
-                const response = await fetch('http://localhost:8080/api/classes', {
+                const response = await fetch('http://127.0.0.1:8080/api/classes', {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
@@ -389,13 +391,13 @@ function initAddSubject() {
 
         if (name) {
             try {
-                const response = await fetch('http://localhost:8080/api/subjects', {
+                const response = await fetch('http://127.0.0.1:8080/api/subjects', {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json"
                     },
                     body: JSON.stringify({
-                        subjectName: name,
+                        name: name,
                         subjectDescription: desc,
                         subjectType: type
                     })
@@ -406,8 +408,8 @@ function initAddSubject() {
                     
                     db.subjects.push({ 
                         id: savedSubject.subjectId, 
-                        name: savedSubject.subjectName, 
-                        color: generateDistinctColor(savedSubject.subjectName) 
+                        name: savedSubject.name, 
+                        color: generateDistinctColor(savedSubject.name) 
                     });
 
                     renderSubjectsSidebar();

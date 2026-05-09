@@ -30,18 +30,14 @@ async function fetchScheduleForClass(className) {
     const gridContainer = document.getElementById('schedule-grid-container');
     
     try {
-        const response = await fetch(`http://localhost:8080/api/schedule/class/${className}`);
+        const response = await fetch(`http://127.0.0.1:8080/api/schedule/class/${className}`);
         
         if (!response.ok) {
             throw new Error('Програмата за този клас не е намерена.');
         }
 
         const scheduleData = await response.json();
-        
-        // ===== ДОБАВИ ТОЗИ РЕД =====
         console.log("Данни от сървъра за клас", className, ":", scheduleData);
-        // ===========================
-
         renderScheduleGrid(scheduleData);
 
     } catch (error) {
@@ -52,10 +48,10 @@ async function fetchScheduleForClass(className) {
 
 function renderScheduleGrid(scheduleData) {
     const gridContainer = document.getElementById('schedule-grid-container');
-    gridContainer.innerHTML = ''; // Изчистваме контейнера
+    gridContainer.innerHTML = '';
 
     gridContainer.innerHTML += `
-        <div></div> 
+        <div></div>
         <div class="grid-head">Понеделник</div>
         <div class="grid-head">Вторник</div>
         <div class="grid-head">Сряда</div>
@@ -67,7 +63,7 @@ function renderScheduleGrid(scheduleData) {
     const classTimes = ["08:00-08:45", "09:05-09:50", "10:00-10:45", "10:55-11:40", "11:50-12:35", "12:45-13:30", "13:50-14:35", "14:40-15:25"];
 
     for (let period = 0; period < 8; period++) {
-        
+
         const timeSlotHTML = `
             <div class="time-slot mt-2">
                 <span>${period + 1}. Час</span>
@@ -77,31 +73,40 @@ function renderScheduleGrid(scheduleData) {
         gridContainer.innerHTML += timeSlotHTML;
 
         days.forEach(day => {
-            const lesson = scheduleData[day] ? scheduleData[day][period] : null;
+            // FIXED: lessons is now an ARRAY of items
+            const lessons = scheduleData[day] ? scheduleData[day][period] : [];
 
-            if (lesson && lesson.subject) {
-                
-                const subjectName = lesson.subject.subjectName;
-                const roomInfo = lesson.room ? lesson.room.roomId : '';
-                const teacherName = lesson.teacher ? lesson.teacher.name : '';
+            if (lessons && lessons.length > 0) {
+                // We wrap multiple lessons in a flex container so they sit side-by-side
+                let cellHTML = `<div style="display: flex; gap: 4px; width: 100%; height: 100%;">`;
 
-                const cardColor = generateDistinctColor(subjectName);
-                const cardHTML = `
-                    <div class="subject-card" style="background-color: ${cardColor};">
-                        <div class="subject-name" title="${subjectName}">${subjectName}</div>
-                        <div class="subject-details" style="display: flex; flex-direction: column; gap: 2px;">
-                            <span>${roomInfo ? `стая ${roomInfo}` : ''}</span>
-                            <span style="font-size: 0.8em; opacity: 0.85;"> '${teacherName}</span>
-                        </div>
-                    </div>
-                `;
-                if (lesson && lesson.subject) {
-                    gridContainer.innerHTML += cardHTML;
-                } else {
-                    gridContainer.innerHTML += `<div class="empty-slot"></div>`; 
-                }
-                } else {
-                    gridContainer.innerHTML += `<div></div>`; 
+                lessons.forEach(lesson => {
+                    if (lesson.subject) {
+                        const name = lesson.subject.name;
+                        const roomInfo = lesson.room ? lesson.room.roomId : '';
+                        const teacherName = lesson.teacher ? lesson.teacher.name : '';
+                        const cardColor = generateDistinctColor(name);
+
+                        // flex: 1 makes them divide the space equally!
+                        cellHTML += `
+                            <div class="subject-card" style="background-color: ${cardColor}; flex: 1; min-width: 0; padding: 5px; border-radius: 6px; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; justify-content: center;">
+                                <div class="subject-name" title="${name}" style="font-weight: bold; text-align: center; font-size: 0.85em; white-space: normal; line-height: 1.1; margin-bottom: 4px;">
+                                    ${name}
+                                </div>
+                                <div class="subject-details" style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                                    <span style="font-size: 0.75em; font-weight: 600;">${roomInfo ? `${roomInfo}` : ''}</span>
+                                    <span style="font-size: 0.7em; opacity: 0.85; text-align: center;">${teacherName}</span>
+                                </div>
+                            </div>
+                        `;
+                    }
+                });
+
+                cellHTML += `</div>`;
+                gridContainer.innerHTML += cellHTML;
+            } else {
+                // Empty cell if nothing is scheduled
+                gridContainer.innerHTML += `<div class="empty-slot" style="min-height: 80px;"></div>`;
             }
         });
     }

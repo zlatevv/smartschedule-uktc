@@ -84,7 +84,7 @@ async function exportAllClassesToPDF(btnElement) {
 
         for (let i = 0; i < sortedClasses.length; i++) {
             const classCode = sortedClasses[i];
-            const res = await fetch(`http://localhost:8080/api/schedule/class/${classCode}`);
+            const res = await fetch(`http://127.0.0.1:8080/api/schedule/class/${classCode}`);
             let scheduleData = null;
             if (res.ok) scheduleData = await res.json();
 
@@ -175,8 +175,8 @@ function buildStaticTableForPrint(classCode, scheduleData) {
                 slot = scheduleData[day][period - 1];
             }
 
-            if (slot && slot.subject && slot.subject.subjectName) {
-                const subjName = slot.subject.subjectName;
+            if (slot && slot.subject && slot.subject.name) {
+                const subjName = slot.subject.name;
                 const tName = slot.teacher ? slot.teacher.name : "";
                 const rName = slot.room ? (slot.room.name || slot.room.roomId) : "";
                 

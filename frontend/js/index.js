@@ -9,7 +9,7 @@ async function loadClassesFromDatabase() {
     select.innerHTML = '<option value="" disabled selected>⏳ Зареждане на класове...</option>';
 
     try {
-        const response = await fetch('http://localhost:8080/api/classes');
+        const response = await fetch('http://127.0.0.1:8080/api/classes');
         
         if (!response.ok) {
             throw new Error('Грешка при връзката със сървъра');

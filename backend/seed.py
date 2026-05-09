@@ -83,11 +83,11 @@ def seed():
         print(f"  Inserted {rooms_count} rooms.")
 
         # ── 4. Build grade → [(subject_name, hours)] from curriculum.csv ─────
-        # curriculum.csv columns: Grade, SubjectName, Hours
+        # curriculum.csv columns: Grade, name, Hours
         grade_subjects: dict[int, list[tuple[str, int]]] = {}
         for row in read_csv("curriculum.csv"):
             grade = int(row["Grade"].strip())
-            subj_name = row["SubjectName"].strip()
+            subj_name = row["name"].strip()
             hours = int(row["Hours"].strip())
             grade_subjects.setdefault(grade, []).append((subj_name, hours))
 

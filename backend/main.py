@@ -112,10 +112,12 @@ def get_class_schedule(class_name: str, db: Session = Depends(get_db)):
           .all()
     )
 
-    if not records:
-        return {day: [None] * 8 for day in DAYS_MAP.values()}
+    # FIXED: Initialize with empty arrays instead of None so we can stack classes
+    schedule = {day: [ [] for _ in range(8) ] for day in DAYS_MAP.values()}
 
-    # Bulk-load related rows once – eliminates N+1 queries
+    if not records:
+        return schedule
+
     subject_ids = {r.subject_id for r in records}
     room_ids    = {r.room_id    for r in records if r.room_id}
     teacher_ids = {r.teacher_id for r in records}
@@ -133,8 +135,6 @@ def get_class_schedule(class_name: str, db: Session = Depends(get_db)):
         db.query(models.Teacher).filter(models.Teacher.id.in_(teacher_ids))
     }
 
-    schedule = {day: [None] * 8 for day in DAYS_MAP.values()}
-
     for r in records:
         day_name = DAYS_MAP.get(r.day_of_week)
         if day_name is None or not (0 <= r.period < 8):
@@ -144,18 +144,20 @@ def get_class_schedule(class_name: str, db: Session = Depends(get_db)):
         room    = rooms_by_id.get(r.room_id)
         teacher = teachers_by_id.get(r.teacher_id)
 
-        schedule[day_name][r.period] = {
-            "subject": {"subjectName": subject.name} if subject else None,
+        # FIXED: Append to the list so we don't overwrite parallel classes!
+        schedule[day_name][r.period].append({
+            "subject": {"name": subject.name} if subject else None,
             "room":    {"roomId": room.name}         if room    else None,
             "teacher": {"name": teacher.name}        if teacher else None,
-        }
+            "groupId": r.group_id
+        })
 
     return schedule
 
 
 # ── generate ──────────────────────────────────────────────────────────────────
 
-@app.post("/api/generate")
+@app.post("/api/schedule/generate/all")
 def generate_schedule(background_tasks: BackgroundTasks):
     if solver_state.running:
         raise HTTPException(
