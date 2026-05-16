@@ -320,3 +320,26 @@ def get_classes_details(db: Session = Depends(get_db)):
             "headTeacher": head.name if head else None,
         })
     return result
+
+
+@app.get("/api/classes/{class_name}/subjects")
+def get_class_subjects(class_name: str, db: Session = Depends(get_db)):
+    db_class = db.query(models.Class).filter(models.Class.name == class_name).first()
+    if not db_class:
+        raise HTTPException(status_code=404, detail="Класът не е намерен")
+
+    rows = (
+        db.query(models.ClassCurriculum)
+        .filter(models.ClassCurriculum.class_id == db_class.id)
+        .all()
+    )
+
+    subject_ids = {r.subject_id for r in rows}
+    subjects = (
+        db.query(models.Subject)
+        .filter(models.Subject.id.in_(subject_ids))
+        .order_by(models.Subject.name)
+        .all()
+    )
+
+    return [{"id": s.id, "name": s.name} for s in subjects]

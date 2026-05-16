@@ -7,10 +7,7 @@ Reads data from the CSV files in the same directory:
   - curriculum.csv
   - rooms.csv
 
-Usage:
-    python seed_school_db.py
-
-Place this file next to database.py, models.py, and the CSV files.
+Only seeds if the database is empty (safe to run on every startup).
 """
 
 import csv
@@ -27,12 +24,18 @@ def read_csv(filename):
 
 
 def seed():
-    Base.metadata.drop_all(bind=engine)
+    # Always make sure tables exist (safe on an already-seeded DB)
     Base.metadata.create_all(bind=engine)
-    print("Tables dropped and recreated.")
 
     db = SessionLocal()
     try:
+        # ── Check if already seeded ──────────────────────────────────────────
+        if db.query(Teacher).count() > 0:
+            print("Database already seeded, skipping.")
+            return
+
+        print("Database is empty, seeding...")
+
         # ── 1. Subjects ──────────────────────────────────────────────────────
         subject_map: dict[str, int] = {}
         for row in read_csv("subjects.csv"):
@@ -57,7 +60,6 @@ def seed():
             db.flush()
             teacher_map[name] = teacher.id
 
-            # Subjects column is pipe-separated, e.g. "БЕЛ|Испански език"
             raw_subjects = row.get("Subjects", "").strip()
             if raw_subjects:
                 for subj_name in raw_subjects.split("|"):
@@ -83,7 +85,6 @@ def seed():
         print(f"  Inserted {rooms_count} rooms.")
 
         # ── 4. Build grade → [(subject_name, hours)] from curriculum.csv ─────
-        # curriculum.csv columns: Grade, name, Hours
         grade_subjects: dict[int, list[tuple[str, int]]] = {}
         for row in read_csv("curriculum.csv"):
             grade = int(row["Grade"].strip())
@@ -92,7 +93,6 @@ def seed():
             grade_subjects.setdefault(grade, []).append((subj_name, hours))
 
         # ── 5. Classes + ClassCurriculum ─────────────────────────────────────
-        # classes.csv columns: Name, Grade, HeadTeacher
         curriculum_count = 0
         missing_teachers = set()
         for row in read_csv("classes.csv"):
