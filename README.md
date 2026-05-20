@@ -92,6 +92,15 @@ The default teacher login is configured in `backend/auth.py`. Students and paren
 
 ---
 
+## 🐳 Docker Hub
+
+Pre-built images are available on Docker Hub:
+
+- [`zlatevv/smartschedule-backend`](https://hub.docker.com/r/zlatevv/smartschedule-backend)
+- [`zlatevv/smartschedule-frontend`](https://hub.docker.com/r/zlatevv/smartschedule-frontend)
+
+---
+
 ## 📁 Project Structure
 
 ```
